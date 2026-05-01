@@ -93,13 +93,20 @@ async def analyse(req: AnalyseRequest, background_tasks: BackgroundTasks):
     return {"job_id": job_id, "status": "started", "message": "Analysis running — poll /status/{job_id}"}
 
 
-async def _run_analysis_job(job_id: str, name: str, url: str, category: str):
+def _run_analysis_job(job_id: str, name: str, url: str, category: str):
     try:
         from orchestrator import run_full_analysis, get_summary
         _jobs[job_id]["status"]   = "running"
-        result  = run_full_analysis(name, url, category)
+        _jobs[job_id]["pipeline"] = "starting"
+
+        def _progress(pipeline_key: str, done: int, total: int):
+            _jobs[job_id]["pipeline"] = pipeline_key
+            _jobs[job_id]["progress"] = round((done / total) * 100)
+
+        result  = run_full_analysis(name, url, category, progress_cb=_progress)
         summary = get_summary(result)
         _jobs[job_id]["status"]   = "complete"
+        _jobs[job_id]["progress"] = 100
         _jobs[job_id]["result"]   = summary
         _jobs[job_id]["run_id"]   = result["run_id"]
     except Exception as e:
@@ -205,6 +212,14 @@ if frontend_path.exists():
     @app.get("/")
     async def serve_frontend():
         return FileResponse(str(frontend_path / "index.html"))
+
+    @app.get("/style.css")
+    async def serve_css():
+        return FileResponse(str(frontend_path / "style.css"), media_type="text/css")
+
+    @app.get("/app.js")
+    async def serve_js():
+        return FileResponse(str(frontend_path / "app.js"), media_type="application/javascript")
 
 
 if __name__ == "__main__":

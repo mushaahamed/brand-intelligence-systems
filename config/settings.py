@@ -39,6 +39,8 @@ REQUEST_TIMEOUT= int(os.getenv("REQUEST_TIMEOUT", "30"))
 RATE_LIMIT_DELAY = float(os.getenv("RATE_LIMIT_DELAY", "2"))
 API_HOST       = os.getenv("API_HOST", "0.0.0.0")
 API_PORT       = int(os.getenv("API_PORT", "8000"))
+TRACKING_BASE  = os.getenv("TRACKING_BASE", f"http://localhost:{os.getenv('API_PORT', '8000')}/track")
+ACTOR_TIMEOUT  = int(os.getenv("ACTOR_TIMEOUT", "60"))   # seconds per Apify actor run
 
 
 def validate_config() -> dict:

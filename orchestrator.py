@@ -11,7 +11,7 @@ from utils.helpers import make_run_id, timestamp
 log = structlog.get_logger()
 
 
-def run_full_analysis(company_name: str, company_url: str, category: str) -> dict:
+def run_full_analysis(company_name: str, company_url: str, category: str, progress_cb=None) -> dict:
     """
     Run the complete 12-pipeline brand intelligence analysis.
 
@@ -52,8 +52,18 @@ def run_full_analysis(company_name: str, company_url: str, category: str) -> dic
     from pipelines.p11_outreach.pipeline          import OutreachPipeline
     from pipelines.p12_tracking.pipeline          import TrackingPipeline
 
+    PIPELINE_KEYS = [
+        "p01_company_overview", "p02_brand_identity", "p03_market_position",
+        "p04_competitor_mapping", "p05_brand_activity", "p06_experiential_footprint",
+        "p07_reputation_research", "p08_strategic_watchouts", "p09_decision_makers",
+        "p10_contact_intelligence", "p11_outreach", "p12_tracking",
+    ]
+    _done = [0]
+
     def _run(pipeline_class, pipeline_key, **extra_kwargs):
         log.info("running_pipeline", pipeline=pipeline_key)
+        if progress_cb:
+            progress_cb(pipeline_key, _done[0], len(PIPELINE_KEYS))
         try:
             if extra_kwargs:
                 p = pipeline_class(company_name, company_url, category, **extra_kwargs)
@@ -61,11 +71,13 @@ def run_full_analysis(company_name: str, company_url: str, category: str) -> dic
                 p = pipeline_class(company_name, company_url, category)
             result = p.run()
             results["pipelines"][pipeline_key] = result
+            _done[0] += 1
             log.info("pipeline_done", pipeline=pipeline_key, status=result.get("status"))
             return result
         except Exception as e:
             log.error("pipeline_exception", pipeline=pipeline_key, error=str(e))
             results["pipelines"][pipeline_key] = {"status": "error", "error": str(e), "output": {}}
+            _done[0] += 1
             return {"status": "error", "output": {}}
 
     # ── RUN PIPELINES (sequential — each builds on previous) ─────────────────

@@ -9,7 +9,7 @@ import time
 import requests
 import structlog
 from typing import Any, Optional
-from config.settings import APIFY_TOKENS, MAX_RETRIES, REQUEST_TIMEOUT, RATE_LIMIT_DELAY
+from config.settings import APIFY_TOKENS, MAX_RETRIES, REQUEST_TIMEOUT, RATE_LIMIT_DELAY, ACTOR_TIMEOUT
 from config.apify_config import ACTORS, TOKEN_GROUP_MAP, ACTOR_DEFAULTS
 
 log = structlog.get_logger()
@@ -29,9 +29,11 @@ def run_actor(
     actor_key: str,
     run_input: dict,
     pipeline_id: str,
-    timeout_secs: int = 120,
+    timeout_secs: int = None,
     wait_for_finish: bool = True,
 ) -> Optional[list[dict]]:
+    if timeout_secs is None:
+        timeout_secs = ACTOR_TIMEOUT
     """
     Run an Apify actor and return its dataset items.
 
