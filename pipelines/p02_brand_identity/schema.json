@@ -1,0 +1,19 @@
+{
+  "pipeline_id": "p02_brand_identity",
+  "output_fields": {
+    "primary_colors": ["hex codes extracted from website CSS/logo"],
+    "secondary_colors": ["hex codes"],
+    "color_palette_label": "Warm | Cool | Neutral | Bold | Pastel | Monochrome",
+    "primary_font": "font name or 'Unknown'",
+    "secondary_font": "font name or null",
+    "font_style": "Serif | Sans-serif | Mixed | Display",
+    "brand_tone": "Playful | Professional | Bold | Minimalist | Premium | Technical | Friendly",
+    "brand_voice_keywords": ["3-5 adjectives describing how the brand talks"],
+    "tagline": "official tagline or null",
+    "logo_style": "Wordmark | Lettermark | Pictorial | Abstract | Combination",
+    "visual_style": "Minimal | Illustrative | Photo-driven | Bold/Graphic | Corporate",
+    "brand_maturity": "Emerging | Developing | Established | Premium",
+    "missing_brand_elements": ["list of what the brand is visually lacking"],
+    "experiential_design_angle": "How StepOneXP should mirror the brand in event design"
+  }
+}

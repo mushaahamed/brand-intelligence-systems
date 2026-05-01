@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BrandScope — StepOneXP Intelligence Platform</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <!-- ── HEADER ── -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-mark">◈</span>
+        <span class="logo-text">BrandScope</span>
+        <span class="logo-badge">by StepOneXP</span>
+      </div>
+      <nav class="header-nav">
+        <a href="#analyse" class="nav-link active">Analyse</a>
+        <a href="#reports" class="nav-link" onclick="showReports()">Reports</a>
+        <a href="https://github.com/mushaahamed/brand-intelligence-system" target="_blank" class="nav-link nav-github">GitHub ↗</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ── HERO ── -->
+  <section class="hero" id="analyse">
+    <div class="hero-inner">
+      <div class="hero-tag">Brand Intelligence · 12-Pipeline Analysis</div>
+      <h1 class="hero-title">Know every client<br /><span class="gradient-text">before the first call.</span></h1>
+      <p class="hero-sub">Drop a company URL. Get a full brand dossier — colors, competitors, reputation, decision-makers, and a personalised outreach sequence — in minutes.</p>
+
+      <!-- FORM -->
+      <div class="analyse-card" id="analyseForm">
+        <form id="inputForm">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="company_name">Company Name</label>
+              <input type="text" id="company_name" name="company_name" placeholder="e.g. Mamaearth" required />
+            </div>
+            <div class="form-group">
+              <label for="company_url">Company Website</label>
+              <input type="url" id="company_url" name="company_url" placeholder="https://mamaearth.in" required />
+            </div>
+            <div class="form-group form-group--full">
+              <label for="category">One-Line Category</label>
+              <input type="text" id="category" name="category" placeholder="e.g. D2C skincare brand targeting millennial women in India" required />
+            </div>
+          </div>
+          <button type="submit" class="btn-primary" id="submitBtn">
+            <span class="btn-icon">⚡</span> Run Full Analysis
+          </button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── PROGRESS STATE ── -->
+  <section class="progress-section hidden" id="progressSection">
+    <div class="progress-inner">
+      <div class="progress-header">
+        <div class="pulse-dot"></div>
+        <span id="progressTitle">Analysing <strong id="progressCompany"></strong>…</span>
+      </div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+      <div class="pipeline-grid" id="pipelineGrid">
+        <!-- filled by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- ── RESULTS SECTION ── -->
+  <section class="results-section hidden" id="resultsSection">
+    <div class="results-inner">
+      <div class="results-header">
+        <div class="results-meta">
+          <h2 id="resultsTitle">Brand Report</h2>
+          <span class="results-tag" id="resultsRunId"></span>
+        </div>
+        <div class="results-actions">
+          <button class="btn-secondary" onclick="downloadReport()">↓ Export JSON</button>
+          <button class="btn-secondary" onclick="resetForm()">+ New Analysis</button>
+        </div>
+      </div>
+
+      <!-- ICP SCORE BANNER -->
+      <div class="icp-banner" id="icpBanner">
+        <div class="icp-score" id="icpScore">—</div>
+        <div class="icp-label">
+          <div class="icp-title">ICP Fit Score</div>
+          <div class="icp-sub" id="icpSub">Evaluating fit for StepOneXP services…</div>
+        </div>
+        <div class="icp-verdict" id="icpVerdict"></div>
+      </div>
+
+      <!-- PIPELINE TABS -->
+      <div class="tabs" id="pipelineTabs">
+        <button class="tab active" data-tab="overview">Overview</button>
+        <button class="tab" data-tab="brand">Brand</button>
+        <button class="tab" data-tab="market">Market</button>
+        <button class="tab" data-tab="events">Events</button>
+        <button class="tab" data-tab="people">People</button>
+        <button class="tab" data-tab="outreach">Outreach</button>
+        <button class="tab" data-tab="tracking">Tracking</button>
+      </div>
+
+      <!-- TAB PANELS -->
+      <div class="tab-panels">
+
+        <!-- OVERVIEW tab -->
+        <div class="tab-panel active" id="panel-overview">
+          <div class="panel-grid">
+            <div class="card" id="card-company"></div>
+            <div class="card" id="card-market"></div>
+            <div class="card" id="card-reputation"></div>
+            <div class="card" id="card-watchouts"></div>
+          </div>
+        </div>
+
+        <!-- BRAND tab -->
+        <div class="tab-panel" id="panel-brand">
+          <div class="panel-grid">
+            <div class="card card--wide" id="card-colors"></div>
+            <div class="card card--wide" id="card-voice"></div>
+            <div class="card card--wide" id="card-competitors"></div>
+          </div>
+        </div>
+
+        <!-- MARKET tab -->
+        <div class="tab-panel" id="panel-market">
+          <div class="panel-grid">
+            <div class="card card--wide" id="card-position"></div>
+            <div class="card card--wide" id="card-activity"></div>
+          </div>
+        </div>
+
+        <!-- EVENTS tab -->
+        <div class="tab-panel" id="panel-events">
+          <div class="panel-grid">
+            <div class="card card--full" id="card-events"></div>
+          </div>
+        </div>
+
+        <!-- PEOPLE tab -->
+        <div class="tab-panel" id="panel-people">
+          <div class="panel-grid">
+            <div class="card card--full" id="card-people"></div>
+          </div>
+        </div>
+
+        <!-- OUTREACH tab -->
+        <div class="tab-panel" id="panel-outreach">
+          <div class="panel-grid">
+            <div class="card card--full" id="card-outreach"></div>
+          </div>
+        </div>
+
+        <!-- TRACKING tab -->
+        <div class="tab-panel" id="panel-tracking">
+          <div class="panel-grid">
+            <div class="card card--full" id="card-tracking"></div>
+          </div>
+        </div>
+
+      </div><!-- /tab-panels -->
+    </div>
+  </section>
+
+  <!-- ── REPORTS LIST ── -->
+  <section class="reports-section hidden" id="reportsSection">
+    <div class="reports-inner">
+      <div class="reports-header">
+        <h2>Past Reports</h2>
+        <button class="btn-secondary" onclick="showAnalyse()">+ New Analysis</button>
+      </div>
+      <div class="reports-grid" id="reportsGrid">Loading…</div>
+    </div>
+  </section>
+
+  <!-- ── TOAST ── -->
+  <div class="toast hidden" id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

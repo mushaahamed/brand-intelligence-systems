@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "P10 Contact Intelligence Output",
+  "type": "object",
+  "required": ["contact_cards","domain","data_disclaimer"],
+  "properties": {
+    "contact_cards": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name","title","recommended_channel"],
+        "properties": {
+          "name":                 { "type": "string" },
+          "title":                { "type": "string" },
+          "email":                { "type": ["string","null"] },
+          "email_confidence":     { "type": "integer", "minimum": 0, "maximum": 100 },
+          "email_source":         { "type": "string", "enum": ["HUNTER_VERIFIED","HUNTER_PATTERN","PATTERN_INFERRED","NOT_FOUND"] },
+          "linkedin_url":         { "type": ["string","null"] },
+          "recommended_channel":  { "type": "string", "enum": ["EMAIL_FIRST","LINKEDIN_FIRST","EMAIL_AND_LINKEDIN"] },
+          "channel_rationale":    { "type": ["string","null"] }
+        }
+      }
+    },
+    "company_email_pattern": { "type": ["string","null"] },
+    "domain":                { "type": "string" },
+    "data_disclaimer":       { "type": "string" }
+  }
+}

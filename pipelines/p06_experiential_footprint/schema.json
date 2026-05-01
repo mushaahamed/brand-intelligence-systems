@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "P06 Experiential Footprint Output",
+  "type": "object",
+  "required": ["events_timeline","experiential_maturity_score","pitch_angle","opening_line_for_pitch"],
+  "properties": {
+    "events_timeline": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "event_name":  { "type": "string" },
+          "year":        { "type": ["string","null"] },
+          "format":      { "type": "string" },
+          "scale":       { "type": "string", "enum": ["MEGA","LARGE","MEDIUM","SMALL"] },
+          "location":    { "type": ["string","null"] },
+          "quality":     { "type": "string", "enum": ["PREMIUM","STANDARD","BASIC"] },
+          "description": { "type": ["string","null"] }
+        },
+        "required": ["event_name","format","scale","quality"]
+      }
+    },
+    "experiential_maturity_score": { "type": "integer", "minimum": 1, "maximum": 5 },
+    "formats_used":         { "type": "array", "items": { "type": "string" } },
+    "formats_missing":      { "type": "array", "items": { "type": "string" } },
+    "geographies_covered":  { "type": "array", "items": { "type": "string" } },
+    "geographies_missing":  { "type": "array", "items": { "type": "string" } },
+    "pitch_angle":          { "type": "string" },
+    "opening_line_for_pitch":{ "type": "string" }
+  }
+}

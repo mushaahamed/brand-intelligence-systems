@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "P08 Strategic Watchouts Output",
+  "type": "object",
+  "required": ["overall_verdict","timing_recommendation","pitch_tone_adjustment"],
+  "properties": {
+    "overall_verdict": { "type": "string", "enum": ["GREEN","AMBER","RED"] },
+    "leadership_changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name":       { "type": "string" },
+          "old_role":   { "type": ["string","null"] },
+          "new_role":   { "type": ["string","null"] },
+          "implication":{ "type": "string" }
+        }
+      }
+    },
+    "active_controversies":       { "type": "array", "items": { "type": "string" } },
+    "funding_status":             { "type": ["string","null"] },
+    "known_agency_relationships": { "type": "array", "items": { "type": "string" } },
+    "cost_cutting_signals":       { "type": "boolean" },
+    "timing_recommendation":      { "type": "string" },
+    "pitch_tone_adjustment":      { "type": "string" }
+  }
+}

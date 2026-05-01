@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "P03 Market Position Output",
+  "type": "object",
+  "required": ["share_of_voice_level", "brand_sentiment", "perception_gap_score", "pitch_implication"],
+  "properties": {
+    "share_of_voice_level": { "type": "string", "enum": ["HIGH","MEDIUM","LOW"] },
+    "brand_sentiment":       { "type": "string", "enum": ["POSITIVE","NEUTRAL","MIXED","NEGATIVE"] },
+    "perception_gap_score":  { "type": ["integer","null"], "minimum": 1, "maximum": 5 },
+    "recent_sentiment_shift":{ "type": ["string","null"] },
+    "key_brand_associations":{ "type": "array", "items": { "type": "string" } },
+    "top_media_channels":    { "type": "array", "items": { "type": "string" } },
+    "pitch_implication":     { "type": ["string","null"] }
+  }
+}

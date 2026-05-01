@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "P11 Outreach Sequence Output",
+  "type": "object",
+  "required": ["outreach_sequences","global_personalisation_context"],
+  "properties": {
+    "outreach_sequences": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["contact_name","touches"],
+        "properties": {
+          "contact_name": { "type": "string" },
+          "touches": {
+            "type": "array",
+            "minItems": 4,
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "required": ["touch_number","channel","send_day","body","cta"],
+              "properties": {
+                "touch_number": { "type": "integer", "minimum": 1, "maximum": 4 },
+                "channel":      { "type": "string", "enum": ["EMAIL","LINKEDIN"] },
+                "send_day":     { "type": "integer" },
+                "subject":      { "type": ["string","null"] },
+                "body":         { "type": "string" },
+                "cta":          { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "global_personalisation_context": { "type": "object" }
+  }
+}

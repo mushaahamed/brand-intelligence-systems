@@ -1,0 +1,21 @@
+{
+  "pipeline_id": "p01_company_overview",
+  "output_fields": {
+    "business_model": "B2B | B2C | B2B2C | Marketplace | SaaS | Other",
+    "industry_vertical": "Specific sub-vertical e.g. 'consumer lending', 'quick commerce'",
+    "founding_year": "integer or null",
+    "employee_count_range": "1-10 | 11-50 | 51-200 | 200-1000 | 1000+",
+    "funding_status": "Bootstrapped | Seed | Series A | Series B | Series C+ | Public | PE-backed | Unknown",
+    "geography": "comma-separated list of countries/cities where active",
+    "hq_city": "string",
+    "revenue_range": "$0-1M | $1-10M | $10-50M | $50M+ | Unknown",
+    "marketing_maturity_score": "1-5 integer",
+    "website_quality_score": "1-5 integer",
+    "icp_fit_score": "0-100 integer",
+    "experiential_readiness": "HIGH | MEDIUM | LOW",
+    "recommended_service": "Consumer activations | Corporate events | Product launch | Employee experience | Brand gifting | Multi-format",
+    "company_narrative": "1 paragraph, max 100 words",
+    "key_facts": ["array of 3-5 specific facts found in research"],
+    "sources_used": ["array of URLs or source names"]
+  }
+}

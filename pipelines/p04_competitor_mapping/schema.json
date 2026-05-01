@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "P04 Competitor Mapping Output",
+  "type": "object",
+  "required": ["competitors", "experiential_white_space", "recommended_pitch_angle"],
+  "properties": {
+    "competitors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name":               { "type": "string" },
+          "website":            { "type": ["string","null"] },
+          "brand_positioning":  { "type": "string" },
+          "target_audience":    { "type": ["string","null"] },
+          "events_activity":    { "type": "string", "enum": ["HIGH","MEDIUM","LOW","NONE"] },
+          "experiential_gap":   { "type": "string" },
+          "threat_level":       { "type": "string", "enum": ["HIGH","MEDIUM","LOW"] }
+        },
+        "required": ["name","brand_positioning","events_activity","experiential_gap"]
+      }
+    },
+    "experiential_white_space": { "type": "string" },
+    "recommended_pitch_angle":  { "type": "string" },
+    "market_maturity":          { "type": ["string","null"], "enum": ["EARLY","GROWING","MATURE","SATURATED",null] }
+  }
+}

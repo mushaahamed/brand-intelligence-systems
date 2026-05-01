@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "P12 Tracking Setup Output",
+  "type": "object",
+  "required": ["dashboard_entries","scoring_rubric","status_thresholds"],
+  "properties": {
+    "dashboard_entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["contact_name","tracking_id","status","score","next_action"],
+        "properties": {
+          "contact_name":  { "type": "string" },
+          "tracking_id":   { "type": "string" },
+          "status":        { "type": "string", "enum": ["COLD","OPENED","ENGAGED","WARM","HOT"] },
+          "score":         { "type": "integer", "minimum": 0 },
+          "next_action":   { "type": "string" },
+          "touch_tracking": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "touch_number":       { "type": "integer" },
+                "channel":            { "type": "string" },
+                "send_date_offset":   { "type": "integer" },
+                "tracking_pixel_html":{ "type": ["string","null"] },
+                "tracked_links":      { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "scoring_rubric": {
+      "type": "object",
+      "properties": {
+        "email_open":       { "type": "integer" },
+        "email_click":      { "type": "integer" },
+        "linkedin_accept":  { "type": "integer" },
+        "linkedin_reply":   { "type": "integer" },
+        "email_reply":      { "type": "integer" },
+        "meeting_booked":   { "type": "integer" }
+      }
+    },
+    "status_thresholds": {
+      "type": "object",
+      "properties": {
+        "COLD":    { "type": "integer" },
+        "OPENED":  { "type": "integer" },
+        "ENGAGED": { "type": "integer" },
+        "WARM":    { "type": "integer" },
+        "HOT":     { "type": "integer" }
+      }
+    },
+    "tracking_base_url": { "type": ["string","null"] }
+  }
+}

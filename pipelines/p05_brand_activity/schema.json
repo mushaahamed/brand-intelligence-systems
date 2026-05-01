@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "P05 Brand Activity Output",
+  "type": "object",
+  "required": ["social_content_cadence","budget_signal","upcoming_opportunity_window"],
+  "properties": {
+    "recent_campaigns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name":             { "type": "string" },
+          "type":             { "type": "string" },
+          "approximate_date": { "type": ["string","null"] },
+          "description":      { "type": "string" }
+        }
+      }
+    },
+    "social_content_cadence":     { "type": "string", "enum": ["DAILY","MULTIPLE_PER_WEEK","WEEKLY","SPORADIC","INACTIVE"] },
+    "dominant_content_themes":    { "type": "array", "items": { "type": "string" } },
+    "seasonal_pattern":           { "type": ["string","null"] },
+    "budget_signal":              { "type": "string", "enum": ["HIGH","MEDIUM","LOW"] },
+    "upcoming_opportunity_window":{ "type": ["string","null"] },
+    "channel_mix":                { "type": "array", "items": { "type": "string" } },
+    "experiential_readiness":     { "type": ["string","null"] }
+  }
+}
