@@ -742,6 +742,10 @@ function renderContactSequence(idx, sequences, compUsed) {
   const touchesHtml = touches.map(([key, t]) => {
     const isLI   = (t.channel || '').toLowerCase() === 'linkedin';
     const chCls  = isLI ? 'linkedin' : 'email';
+    const msgSafe = (t.message || '').replace(/\\/g,'\\\\').replace(/`/g,"'").replace(/\$/g,'\\$');
+    const emailHref = c.email && !isLI
+      ? `mailto:${encodeURIComponent(c.email || '')}?subject=${encodeURIComponent(t.subject_line || '')}&body=${encodeURIComponent(t.message || '')}`
+      : '';
     return `
     <div class="touch-card">
       <div class="touch-header">
@@ -750,6 +754,11 @@ function renderContactSequence(idx, sequences, compUsed) {
         ${t.subject_line ? `<span class="touch-subj">${esc(t.subject_line)}</span>` : ''}
       </div>
       <div class="touch-body">${esc(t.message || '—')}</div>
+      <div style="padding:8px 18px 12px;display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--border)">
+        ${emailHref ? `<a class="email-btn" href="${emailHref}">✉ Open in Email</a>` : ''}
+        ${c.linkedin && isLI ? `<a class="email-btn" href="${esc(c.linkedin)}" target="_blank">in Open LinkedIn</a>` : ''}
+        <button class="copy-btn" onclick="copyMsg(this,\`${msgSafe}\`)">Copy</button>
+      </div>
     </div>`;
   }).join('');
 
@@ -813,58 +822,161 @@ window.selectContact = function(idx) {
   renderContactSequence(idx, currentSeqs, compUsed);
 };
 
-/* Tracking */
+/* Tracking — Excel-like table with status management */
 function renderTrackingCard(d) {
-  const records = d.tracking_records || [];
-  const rows    = records.map(r => {
-    const dash = r.dashboard_entry || {};
+  const pipes = currentReport?.pipelines || {};
+  const p11   = (pipes.p11_outreach || {}).output || {};
+  const p09   = (pipes.p09_decision_makers || {}).output || {};
+  const p10   = (pipes.p10_contact_intelligence || {}).output || {};
+
+  // Collect all contacts from sequences or people list
+  let contacts = [];
+  const seqs = (p11.contacts_sequences || []).filter(s => s.contact);
+  if (seqs.length) {
+    seqs.forEach(s => {
+      const c   = s.contact || {};
+      const seq = s.sequence || {};
+      const t1  = seq.touch_1 || Object.values(seq)[0] || {};
+      contacts.push({ name: c.name || '—', title: c.title || '—', email: c.email || '',
+        linkedin: c.linkedin || '', priority: c.outreach_priority || '',
+        touch1_subject: t1.subject_line || '', touch1_body: t1.message || '' });
+    });
+  } else {
+    const cmap = {};
+    (p10.contacts || []).forEach(c => { if (c.name) cmap[c.name] = c; });
+    (p09.buying_committee || []).forEach(p => {
+      const ct = cmap[p.name] || {};
+      const t1 = Object.values(p11.outreach_sequence || {})[0] || {};
+      contacts.push({ name: p.name || '—', title: p.title || '—', email: ct.email || '',
+        linkedin: ct.linkedin || '', priority: p.outreach_priority || '',
+        touch1_subject: t1.subject_line || '', touch1_body: t1.message || '' });
+    });
+  }
+  if (!contacts.length && (d.tracking_records || []).length) {
+    (d.tracking_records || []).forEach(r => {
+      contacts.push({ name: r.contact_name || '—', title: '', email: r.contact_email || '',
+        linkedin: '', priority: '', touch1_subject: '', touch1_body: '' });
+    });
+  }
+
+  const storageKey = `track_${currentRunId}`;
+  let statuses = {};
+  try { statuses = JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch {}
+
+  window._trackContacts = contacts;
+
+  const rows = contacts.map((c, i) => {
+    const st  = statuses[c.name] || 'new';
+    const sub = encodeURIComponent(c.touch1_subject || `Following up — ${c.name}`);
+    const bod = encodeURIComponent(c.touch1_body || '');
+    const emailHref = c.email ? `mailto:${encodeURIComponent(c.email)}?subject=${sub}&body=${bod}` : '';
     return `
-    <div class="track-row">
-      <div>
-        <div class="track-name">${esc(r.contact_name || '—')}</div>
-        <div class="track-id">${esc(r.tracking_id || '')}</div>
-        ${r.contact_email ? `<div style="font-family:var(--mono);font-size:10px;color:var(--text-3);margin-top:2px">${esc(r.contact_email)}</div>` : ''}
-      </div>
-      <div style="display:flex;gap:6px;align-items:center">
-        ${badge(dash.status || 'NOT_SENT')}
-        ${badge(dash.next_action || 'Send Touch 1', 'green')}
-      </div>
-      <div class="track-score">${dash.engagement_score ?? 0}</div>
-    </div>`;
+    <tr>
+      <td>
+        <div class="td-name">${esc(c.name)}</div>
+        <div class="td-title">${esc(c.title)}</div>
+      </td>
+      <td>${badge(c.priority || '—', c.priority === 'PRIMARY' ? 'green' : c.priority ? 'amber' : '')}</td>
+      <td class="td-email">${c.email ? esc(c.email) : '<span style="color:var(--text-4)">—</span>'}</td>
+      <td>
+        <select class="status-select s-${st}" onchange="updateTrackStatus('${esc(c.name).replace(/'/g,"\\'")}',this)">
+          <option value="new"       ${st==='new'       ? 'selected':''}>🔵 New</option>
+          <option value="pending"   ${st==='pending'   ? 'selected':''}>🟡 Pending</option>
+          <option value="completed" ${st==='completed' ? 'selected':''}>🟢 Completed</option>
+        </select>
+      </td>
+      <td>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${emailHref ? `<a class="email-btn" href="${emailHref}">✉ Email</a>` : ''}
+          ${c.linkedin ? `<a class="email-btn" href="${esc(c.linkedin)}" target="_blank">in LinkedIn</a>` : ''}
+          ${c.touch1_body ? `<button class="copy-btn" onclick="copyTouchMsg(this,${i})">Copy Msg</button>` : ''}
+        </div>
+      </td>
+    </tr>`;
   }).join('');
 
+  const nNew  = contacts.filter(c => !statuses[c.name] || statuses[c.name] === 'new').length;
+  const nPend = contacts.filter(c => statuses[c.name] === 'pending').length;
+  const nDone = contacts.filter(c => statuses[c.name] === 'completed').length;
+
   $('card-tracking').innerHTML = `
-    <div class="card-head"><span class="card-title">Engagement Tracking</span></div>
-    <div class="card-body">
-      <div class="track-grid">
-        ${rows || '<div style="color:var(--text-3);font-family:var(--mono);font-size:12px;padding:16px 0">No tracking records yet</div>'}
+    <div class="card-head">
+      <span class="card-title">Outreach Tracker</span>
+      <button class="btn-ghost" onclick="exportTrackCSV()" style="font-size:12px;padding:5px 10px">↓ CSV</button>
+    </div>
+    <div class="card-body" style="padding:0">
+      <div style="display:flex;gap:20px;padding:12px 20px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;color:var(--text-3)">
+        <span>${contacts.length} contacts</span>
+        <span style="color:var(--blue)">● ${nNew} new</span>
+        <span style="color:var(--amber)">● ${nPend} pending</span>
+        <span style="color:var(--green)">● ${nDone} completed</span>
       </div>
-      <div class="scoring-model">
-        <div>open +1 · click +5 · reply +10 · meeting +20</div>
-        <div>HOT ≥20 · WARM ≥10 · ENGAGED ≥3 · OPENED ≥1</div>
-        <div style="grid-column:span 2">Pixel: ${esc(d.tracking_base_url || '—')}/open/{id}</div>
+      <div style="overflow-x:auto">
+        <table class="track-table">
+          <thead><tr><th>Contact</th><th>Priority</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="5" style="color:var(--text-3);text-align:center;padding:24px">No contacts found — run an analysis first</td></tr>'}</tbody>
+        </table>
       </div>
+      <div style="padding:10px 20px;font-family:var(--mono);font-size:10px;color:var(--text-4);border-top:1px solid var(--border)">Statuses saved in browser · Export CSV to share or import to spreadsheet</div>
     </div>`;
 }
 
+window.updateTrackStatus = function(name, sel) {
+  const storageKey = `track_${currentRunId}`;
+  let s = {}; try { s = JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch {}
+  s[name] = sel.value;
+  localStorage.setItem(storageKey, JSON.stringify(s));
+  sel.className = `status-select s-${sel.value}`;
+};
+
+window.copyTouchMsg = function(btn, idx) {
+  const c = window._trackContacts?.[idx];
+  if (!c?.touch1_body) return;
+  navigator.clipboard?.writeText(c.touch1_body).then(() => {
+    btn.classList.add('copied'); btn.textContent = '✓ Copied';
+    setTimeout(() => { btn.classList.remove('copied'); btn.textContent = 'Copy Msg'; }, 2000);
+  }).catch(() => toast('Could not access clipboard'));
+};
+
+window.exportTrackCSV = function() {
+  const contacts = window._trackContacts;
+  if (!contacts?.length) { toast('No data to export'); return; }
+  const storageKey = `track_${currentRunId}`;
+  let statuses = {}; try { statuses = JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch {}
+  const rows = [['Name','Title','Priority','Email','LinkedIn','Status']];
+  contacts.forEach(c => rows.push([c.name, c.title, c.priority, c.email, c.linkedin, statuses[c.name] || 'new']));
+  const csv  = rows.map(r => r.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `outreach-${currentRunId || 'export'}.csv`;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+};
+
 /* ════════════════════════════════════════════════════════
-   PDF EXPORT — iframe approach, no popup blockers
+   PDF EXPORT — Blob URL approach (works everywhere)
 ════════════════════════════════════════════════════════ */
 function exportPDF() {
   if (!currentReport) { toast('No report loaded'); return; }
-  toast('Preparing PDF…');
-  const html   = buildPDFHTML(currentReport);
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;border:none;opacity:0;pointer-events:none;';
-  iframe.srcdoc = html;
-  document.body.appendChild(iframe);
-  iframe.onload = () => {
-    setTimeout(() => {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-      setTimeout(() => iframe.parentNode?.removeChild(iframe), 4000);
-    }, 400);
-  };
+  toast('Generating PDF…');
+  const html = buildPDFHTML(currentReport);
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const win  = window.open(url, '_blank');
+  if (win) {
+    win.addEventListener('load', () => { setTimeout(() => win.print(), 600); });
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } else {
+    // Popup blocked → auto-download the HTML file instead
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `brandscope-${(currentReport.company_name || 'report').replace(/\s+/g, '-').toLowerCase()}.html`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+    toast('Downloaded as HTML — open it then Ctrl+P to save as PDF', 6000);
+  }
 }
 window.exportPDF = exportPDF;
 
@@ -900,7 +1012,7 @@ function buildPDFHTML(data) {
 
   function pdfSection(title, content) {
     return `<div style="margin-bottom:28px;page-break-inside:avoid">
-      <div style="font-family:monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6366F1;border-bottom:1px solid #1F2937;padding-bottom:6px;margin-bottom:14px">${e(title)}</div>
+      <div style="font-family:monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#00E676;border-bottom:1px solid #1F2937;padding-bottom:6px;margin-bottom:14px">${e(title)}</div>
       ${content}</div>`;
   }
 
@@ -918,14 +1030,14 @@ function buildPDFHTML(data) {
 
   const compRows = (p04.competitors || []).slice(0, 5).map(c => `
     <tr>
-      <td style="font-weight:600;color:#6366F1;font-family:monospace;font-size:11px;padding:7px 8px;border-bottom:1px solid #1F2937">${e(c.name || '')}</td>
+      <td style="font-weight:600;color:#00E676;font-family:monospace;font-size:11px;padding:7px 8px;border-bottom:1px solid #1F2937">${e(c.name || '')}</td>
       <td style="padding:7px 8px;border-bottom:1px solid #1F2937;font-size:11px;color:#9CA3AF">${e(c.brand_positioning || '—')}</td>
       <td style="padding:7px 8px;border-bottom:1px solid #1F2937;font-size:11px">${e(c.events_activity || '—')}</td>
       <td style="padding:7px 8px;border-bottom:1px solid #1F2937;font-size:11px;color:#6B7280">${e(c.experiential_gap || '—')}</td>
     </tr>`).join('');
 
   const eventCards = (p06.events_timeline || []).slice(0, 8).map(ev => `
-    <div style="padding:10px 12px;background:#111827;border:1px solid #1F2937;border-left:3px solid #6366F1;border-radius:4px;margin-bottom:8px;page-break-inside:avoid">
+    <div style="padding:10px 12px;background:#111827;border:1px solid #1F2937;border-left:3px solid #00E676;border-radius:4px;margin-bottom:8px;page-break-inside:avoid">
       <div style="display:flex;justify-content:space-between;margin-bottom:5px">
         <span style="font-weight:600;font-size:13px">${e(ev.event_name || ev.name || '?')}</span>
         <span style="font-family:monospace;font-size:10px;color:#6B7280">${e(ev.date || ev.year || '')}</span>
@@ -968,9 +1080,9 @@ function buildPDFHTML(data) {
     const touchCards = touches.map(([key, t]) => {
       const isLI = (t.channel || '').toLowerCase() === 'linkedin';
       return `
-      <div style="padding:14px;background:#111827;border:1px solid #1F2937;border-left:3px solid ${isLI ? '#3B82F6' : '#6366F1'};border-radius:4px;margin-bottom:10px;page-break-inside:avoid">
+      <div style="padding:14px;background:#111827;border:1px solid #1F2937;border-left:3px solid ${isLI ? '#3B82F6' : '#00E676'};border-radius:4px;margin-bottom:10px;page-break-inside:avoid">
         <div style="display:flex;justify-content:space-between;margin-bottom:8px">
-          <span style="font-family:monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:${isLI ? '#3B82F6' : '#6366F1'}">${e(t.channel || key)}</span>
+          <span style="font-family:monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:${isLI ? '#3B82F6' : '#00E676'}">${e(t.channel || key)}</span>
           <span style="font-family:monospace;font-size:10px;color:#6B7280">Day ${t.send_day || '—'}</span>
         </div>
         ${t.subject_line ? `<div style="font-weight:600;font-size:13px;margin-bottom:8px">📧 ${e(t.subject_line)}</div>` : ''}
@@ -980,7 +1092,7 @@ function buildPDFHTML(data) {
 
     return `
     <div style="margin-bottom:28px;page-break-before:${idx > 0 ? 'always' : 'avoid'}">
-      <div style="font-family:monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6366F1;border-bottom:1px solid #1F2937;padding-bottom:6px;margin-bottom:14px">
+      <div style="font-family:monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#00E676;border-bottom:1px solid #1F2937;padding-bottom:6px;margin-bottom:14px">
         Sequence ${idx + 1} of ${sequences.length} — ${e(c.name || 'Unknown')}
       </div>
       <div style="padding:10px 14px;background:#111827;border:1px solid #1F2937;border-radius:6px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;font-size:12px">
@@ -1006,7 +1118,7 @@ function buildPDFHTML(data) {
 <!-- COVER -->
 <div style="min-height:100vh;display:flex;flex-direction:column;justify-content:space-between;padding:48px 40px;background:#0B0F1A">
   <div>
-    <div style="font-family:monospace;font-size:11px;letter-spacing:.2em;color:#6366F1;text-transform:uppercase;margin-bottom:10px">◈ BrandScope Intelligence Report</div>
+    <div style="font-family:monospace;font-size:11px;letter-spacing:.2em;color:#00E676;text-transform:uppercase;margin-bottom:10px">◈ BrandScope Intelligence Report</div>
     <h1 style="font-size:40px;font-weight:700;color:#F9FAFB;letter-spacing:-.03em;margin-bottom:6px">${e(data.company_name)}</h1>
     <div style="font-family:monospace;font-size:13px;color:#6B7280;margin-bottom:40px">${e(data.category || '')}</div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;max-width:580px">
@@ -1065,7 +1177,7 @@ function buildPDFHTML(data) {
         ${pdfKV('Tagline', p02.tagline)}
       </div>
       <div>
-        ${(p02.brand_voice_keywords || []).length ? `<div style="margin-bottom:10px"><div style="font-family:monospace;font-size:9px;color:#6B7280;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Voice Keywords</div><div style="display:flex;flex-wrap:wrap;gap:4px">${p02.brand_voice_keywords.map(k => `<span style="font-family:monospace;font-size:10px;padding:2px 7px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);color:#6366F1;border-radius:100px">${e(k)}</span>`).join('')}</div></div>` : ''}
+        ${(p02.brand_voice_keywords || []).length ? `<div style="margin-bottom:10px"><div style="font-family:monospace;font-size:9px;color:#6B7280;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Voice Keywords</div><div style="display:flex;flex-wrap:wrap;gap:4px">${p02.brand_voice_keywords.map(k => `<span style="font-family:monospace;font-size:10px;padding:2px 7px;background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.25);color:#00E676;border-radius:100px">${e(k)}</span>`).join('')}</div></div>` : ''}
         ${p02.experiential_design_angle ? `<div style="font-size:12px;color:#9CA3AF;line-height:1.65;padding:12px;background:#111827;border:1px solid #1F2937;border-radius:6px;margin-top:8px">🎨 ${e(p02.experiential_design_angle)}</div>` : ''}
       </div>
     </div>
@@ -1103,7 +1215,7 @@ function buildPDFHTML(data) {
         <th style="font-family:monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#6B7280;padding:6px 8px;text-align:left;border-bottom:1px solid #1F2937">Their Gap</th>
       </tr></thead>
       <tbody>${compRows}</tbody></table></div>` : '<div style="color:#6B7280;font-family:monospace;font-size:12px">No competitor data</div>'}
-    ${p04.experiential_white_space ? `<div style="margin-top:12px;font-size:12px;color:#6366F1;padding:10px 12px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:4px">🎯 White space: ${e(p04.experiential_white_space)}</div>` : ''}
+    ${p04.experiential_white_space ? `<div style="margin-top:12px;font-size:12px;color:#00E676;padding:10px 12px;background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.25);border-radius:4px">🎯 White space: ${e(p04.experiential_white_space)}</div>` : ''}
   `)}
 </div>
 
@@ -1120,7 +1232,7 @@ function buildPDFHTML(data) {
         ${pdfKV('Frequency', p06.events_frequency)}
         ${pdfKV('Last Event', p06.last_event_months_ago != null ? p06.last_event_months_ago + ' months ago' : null)}
         ${pdfKV('Geography', (p06.geography_of_events || []).join(' · ') || null)}
-        ${p06.pitch_angle ? `<div style="margin-top:10px;font-size:12px;color:#6366F1;padding:8px 10px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:4px">🎯 ${e(p06.pitch_angle)}</div>` : ''}
+        ${p06.pitch_angle ? `<div style="margin-top:10px;font-size:12px;color:#00E676;padding:8px 10px;background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.25);border-radius:4px">🎯 ${e(p06.pitch_angle)}</div>` : ''}
       </div>
     </div>
     ${eventCards || '<div style="color:#6B7280;font-family:monospace;font-size:12px;padding:16px 0">No confirmed events found</div>'}
@@ -1132,7 +1244,7 @@ function buildPDFHTML(data) {
 <div class="pb" style="padding:40px">
   ${pdfSection('Decision Makers & Contact Intelligence', `
     ${peopleCards || '<div style="color:#6B7280;font-family:monospace;font-size:12px">No decision makers found</div>'}
-    ${p10.email_pattern ? `<div style="margin-top:12px;padding:10px 12px;background:#111827;border:1px solid #1F2937;border-radius:4px;font-family:monospace;font-size:11px;color:#6B7280">Email pattern: <span style="color:#6366F1">${e(p10.email_pattern)}@${e(p10.domain || '?')}</span> · ${p10.verified_emails || 0} verified · ${p10.inferred_emails || 0} inferred</div>` : ''}
+    ${p10.email_pattern ? `<div style="margin-top:12px;padding:10px 12px;background:#111827;border:1px solid #1F2937;border-radius:4px;font-family:monospace;font-size:11px;color:#6B7280">Email pattern: <span style="color:#00E676">${e(p10.email_pattern)}@${e(p10.domain || '?')}</span> · ${p10.verified_emails || 0} verified · ${p10.inferred_emails || 0} inferred</div>` : ''}
   `)}
 
   ${pdfSection('Strategic Watchouts', `
@@ -1153,7 +1265,7 @@ function buildPDFHTML(data) {
 
 <!-- OUTREACH SEQUENCES -->
 ${outreachSections ? `<div class="pb" style="padding:40px">
-  <div style="font-family:monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6366F1;border-bottom:1px solid #1F2937;padding-bottom:6px;margin-bottom:20px">4-Touch Outreach Sequences — ${sequences.length} Contact${sequences.length !== 1 ? 's' : ''}</div>
+  <div style="font-family:monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#00E676;border-bottom:1px solid #1F2937;padding-bottom:6px;margin-bottom:20px">4-Touch Outreach Sequences — ${sequences.length} Contact${sequences.length !== 1 ? 's' : ''}</div>
   ${outreachSections}
 </div>` : ''}
 
@@ -1165,6 +1277,23 @@ ${outreachSections ? `<div class="pb" style="padding:40px">
 
 </body></html>`;
 }
+
+/* Copy outreach message to clipboard */
+window.copyMsg = function(btn, text) {
+  navigator.clipboard?.writeText(text).then(() => {
+    btn.classList.add('copied'); btn.textContent = '✓ Copied';
+    setTimeout(() => { btn.classList.remove('copied'); btn.textContent = 'Copy'; }, 2000);
+  }).catch(() => {
+    // Fallback: select + copy
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    btn.classList.add('copied'); btn.textContent = '✓ Copied';
+    setTimeout(() => { btn.classList.remove('copied'); btn.textContent = 'Copy'; }, 2000);
+  });
+};
 
 /* ════════════════════════════════════════════════════════
    REPORTS
