@@ -10,7 +10,7 @@ import re, json, structlog, requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 from pipelines.base import BasePipeline
-from utils.apify_client import run_google_searches_parallel
+from utils.apify_client import run_google_searches_parallel, scrape_linkedin_profiles
 from utils.claude_client import synthesise
 from utils.helpers import safe_json_parse, truncate, normalise_url
 
@@ -204,31 +204,88 @@ class DecisionMakersPipeline(BasePipeline):
 
     def fetch(self) -> dict:
         n   = self.company_name
-        raw = {"google_people": [], "team_page_text": ""}
+        raw = {"google_people": [], "linkedin_people": [], "team_page_text": ""}
 
-        # ── 3 query variants — broad to narrow ──────────────────────
+        # ── Layer 1: Google search — finds LinkedIn profile pages ────
         queries = [
-            # Unquoted company name is more forgiving (catches brand name variants)
             f'{n} "Head of Marketing" OR "CMO" OR "VP Marketing" OR "Marketing Director" linkedin',
             f'{n} "Brand Manager" OR "Brand Director" OR "Events Manager" OR "Head of Brand" linkedin',
             f'{n} "Chief Marketing" OR "Marketing Lead" OR "Growth" OR "CEO" OR "Founder" linkedin profile',
         ]
         raw["google_people"] = run_google_searches_parallel(queries, PIPELINE_ID, num_results=8)
 
-        # ── Scrape company team page as fallback/supplement ──────────
+        # ── Layer 2: Apify LinkedIn search — direct profile data ─────
+        li_queries = [
+            f"{n} Head of Marketing",
+            f"{n} CMO Chief Marketing Officer",
+            f"{n} Brand Manager Marketing",
+        ]
+        for q in li_queries:
+            try:
+                results = scrape_linkedin_profiles(q, PIPELINE_ID, max_results=3)
+                if results:
+                    raw["linkedin_people"].extend(results)
+            except Exception as e:
+                log.warning("p09_linkedin_scrape_error", query=q, error=str(e))
+
+        # ── Layer 3: Company team page scrape ────────────────────────
         if self.company_url:
             try:
                 raw["team_page_text"] = _scrape_team_page(self.company_url)
             except Exception as e:
                 log.warning("p09_team_page_error", error=str(e))
 
-        log.info("p09_google_results", count=len(raw["google_people"]),
+        log.info("p09_fetch_done",
+                 google=len(raw["google_people"]),
+                 linkedin=len(raw["linkedin_people"]),
                  team_page_chars=len(raw.get("team_page_text", "")))
         return raw
 
     def extract(self, raw: dict) -> dict:
         people = _parse_google_results(raw.get("google_people", []), self.company_name)
-        log.info("p09_people_extracted", count=len(people))
+
+        # ── Merge Apify LinkedIn results ──────────────────────────────
+        seen_names = {p["name"].lower() for p in people}
+        for item in raw.get("linkedin_people", []):
+            # harvestapi/linkedin-profile-search returns various field names
+            name = (item.get("fullName") or item.get("name") or
+                    f"{item.get('firstName','')} {item.get('lastName','')}".strip())
+            title = (item.get("headline") or item.get("title") or
+                     item.get("currentPosition") or item.get("jobTitle") or "")
+            li_url = (item.get("profileUrl") or item.get("linkedinUrl") or
+                      item.get("url") or item.get("linkedin_url") or "")
+            email  = item.get("email") or item.get("emailAddress") or ""
+
+            if not name or len(name.split()) < 2:
+                continue
+            if name.lower() in seen_names:
+                continue
+
+            # Check seniority — skip irrelevant results
+            combined = f"{title} {name}".lower()
+            has_seniority = any(k.lower() in combined for k in SENIORITY_KW)
+            if not has_seniority:
+                continue
+
+            role_type = "Economic Buyer" if any(
+                k in title for k in ["CMO","VP","Chief","Director","Head of","CEO","Founder","Managing"]
+            ) else "Initiator"
+
+            seen_names.add(name.lower())
+            people.append({
+                "name":         name,
+                "title":        title[:80],
+                "url":          li_url,
+                "linkedin_url": li_url if "linkedin.com" in li_url else None,
+                "role_type":    role_type,
+                "snippet":      item.get("summary") or item.get("about") or "",
+                "email":        email,
+                "source":       "linkedin_actor",
+            })
+
+        log.info("p09_people_extracted", count=len(people),
+                 from_google=len(_parse_google_results(raw.get("google_people",[]),self.company_name)),
+                 from_linkedin=len([p for p in people if p.get("source")=="linkedin_actor"]))
         return {
             "company_name": self.company_name,
             "people":       people[:10],
