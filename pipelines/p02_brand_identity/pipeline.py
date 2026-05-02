@@ -40,8 +40,11 @@ def _extract_css_assets(html: str, base_url: str) -> list[str]:
 def _fetch_css(url: str) -> str:
     try:
         r = requests.get(url, timeout=8, headers=HEADERS)
-        if r.status_code == 200 and "css" in r.headers.get("content-type", ""):
-            return r.text[:50000]
+        if r.status_code == 200:
+            ct = r.headers.get("content-type", "")
+            # Accept CSS regardless of content-type — many CDNs serve as text/plain or application/octet-stream
+            if "html" not in ct:  # exclude HTML pages accidentally matched
+                return r.text[:50000]
     except Exception:
         pass
     return ""
@@ -54,13 +57,24 @@ def _parse_colors(css_text: str) -> list[str]:
         if len(hex_val) == 4:
             hex_val = "#" + "".join(c*2 for c in hex_val[1:])
         r = int(hex_val[1:3], 16); g = int(hex_val[3:5], 16); b = int(hex_val[5:7], 16)
-        if r > 240 and g > 240 and b > 240: continue
-        if r < 15 and g < 15 and b < 15: continue
-        colors[hex_val] = colors.get(hex_val, 0) + 1
+        # skip near-white (boring backgrounds) and near-black (text defaults)
+        if r > 235 and g > 235 and b > 235: continue
+        if r < 20 and g < 20 and b < 20: continue
+        # Boost weight for colors defined in CSS custom properties (brand colours live here)
+        weight = 1
+        # Find if this hex appears near a CSS variable definition like "--primary-color: #ff4500"
+        pos = m.start()
+        context = css_text[max(0, pos-40):pos]
+        if "--" in context or "brand" in context.lower() or "primary" in context.lower() or "accent" in context.lower():
+            weight = 5
+        colors[hex_val] = colors.get(hex_val, 0) + weight
     for m in RGB_RE.finditer(css_text):
         hex_val = _rgb_to_hex(m.group(1), m.group(2), m.group(3))
+        r = int(m.group(1)); g = int(m.group(2)); b = int(m.group(3))
+        if r > 235 and g > 235 and b > 235: continue
+        if r < 20 and g < 20 and b < 20: continue
         colors[hex_val] = colors.get(hex_val, 0) + 1
-    return [c for c, _ in sorted(colors.items(), key=lambda x: -x[1])][:10]
+    return [c for c, _ in sorted(colors.items(), key=lambda x: -x[1])][:12]
 
 
 def _parse_fonts(css_text: str) -> list[str]:

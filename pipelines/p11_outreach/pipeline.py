@@ -164,9 +164,8 @@ class OutreachPipeline(BasePipeline):
             email   = p10_match.get("email") or person.get("email")
             linkedin = (p10_match.get("linkedin_url") or person.get("linkedin_url")
                         or p10_match.get("linkedin") or person.get("linkedin"))
-            # Skip contacts with no reachable channel
-            if not email and not linkedin:
-                continue
+            # Include everyone — write the outreach regardless of whether email/linkedin was found.
+            # The outreach content is valuable even if the user needs to find contact details manually.
             merged_contacts.append({
                 "name":                    name,
                 "title":                   person.get("title", ""),
@@ -184,8 +183,6 @@ class OutreachPipeline(BasePipeline):
             for c in contacts_p10[:4]:
                 email    = c.get("email")
                 linkedin = c.get("linkedin_url") or c.get("linkedin")
-                if not email and not linkedin:
-                    continue
                 merged_contacts.append({
                     "name":                    c.get("name", ""),
                     "title":                   c.get("title", ""),

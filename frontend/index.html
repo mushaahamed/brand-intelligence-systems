@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>BrandScope — Brand Intelligence</title>
+  <title>BrandScope — Brand Intelligence System</title>
   <link rel="stylesheet" href="style.css"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;1,14..32,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 </head>
 <body>
 
@@ -27,20 +27,24 @@
 </nav>
 
 <!-- ══════════════════════════════════════════
-     FORM SECTION
+     FORM SECTION — HERO + PIPELINE SHOWCASE
 ══════════════════════════════════════════ -->
 <section id="sec-form" class="section">
+
+  <!-- HERO -->
   <div class="hero-wrap">
     <div class="hero-bg-grid"></div>
+    <div class="hero-glow hero-glow--1"></div>
+    <div class="hero-glow hero-glow--2"></div>
 
     <div class="hero-content">
       <div class="hero-left">
         <div class="hero-badge">
           <span class="hero-badge-dot"></span>
-          12-pipeline intelligence system
+          12-pipeline intelligence system · StepOneXP
         </div>
-        <h1 class="hero-title">Understand every brand<br/><span class="hero-accent">before the first call.</span></h1>
-        <p class="hero-body">Drop a URL. BrandScope runs 12 parallel research pipelines — brand identity, competitor mapping, experiential footprint, decision makers, verified contacts — and writes a personalised outreach sequence for every stakeholder. Done in under 2 minutes.</p>
+        <h1 class="hero-title">Every brand. Fully researched.<br/><span class="hero-accent">Before the first call.</span></h1>
+        <p class="hero-body">Drop a URL. BrandScope runs 12 parallel research pipelines — brand identity, competitor mapping, experiential footprint, decision-maker identification, verified contacts — and generates a personalised 4-touch outreach sequence for every stakeholder. Under 2 minutes.</p>
 
         <div class="hero-stats">
           <div class="hero-stat">
@@ -55,7 +59,12 @@
           <div class="hero-stat-divider"></div>
           <div class="hero-stat">
             <div class="hero-stat-num">4×</div>
-            <div class="hero-stat-label">Outreach touches per contact</div>
+            <div class="hero-stat-label">Outreach touches</div>
+          </div>
+          <div class="hero-stat-divider"></div>
+          <div class="hero-stat">
+            <div class="hero-stat-num">GPT-4o</div>
+            <div class="hero-stat-label">Per contact</div>
           </div>
         </div>
       </div>
@@ -63,7 +72,7 @@
       <div class="hero-right">
         <div class="form-card">
           <div class="form-card-top">
-            <div class="form-card-title">New Analysis</div>
+            <div class="form-card-title">Run Analysis</div>
             <div class="form-card-sub">Takes 90–120 seconds</div>
           </div>
           <form id="inputForm">
@@ -72,11 +81,11 @@
               <input type="text" id="company_name" placeholder="e.g. Mamaearth" required autocomplete="off"/>
             </div>
             <div class="field">
-              <label for="company_url">Website</label>
+              <label for="company_url">Website URL</label>
               <input type="url" id="company_url" placeholder="https://mamaearth.in" required/>
             </div>
             <div class="field">
-              <label for="category">One-line category</label>
+              <label for="category">One-line category description</label>
               <input type="text" id="category" placeholder="D2C skincare brand targeting millennial women in India" required/>
             </div>
             <button type="submit" class="btn-primary" id="submitBtn">
@@ -97,7 +106,237 @@
         </div>
       </div>
     </div>
+
+    <!-- Scroll indicator -->
+    <div class="hero-scroll-hint" onclick="document.getElementById('pipelines-showcase').scrollIntoView({behavior:'smooth'})">
+      <span>See how it works</span>
+      <svg viewBox="0 0 16 16" fill="none" width="14" height="14"><path d="M8 3v10M4 9l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
   </div>
+
+  <!-- ══ PIPELINE SHOWCASE ══ -->
+  <div class="pipeline-showcase" id="pipelines-showcase">
+    <div class="ps-inner">
+
+      <div class="ps-header">
+        <div class="ps-eyebrow">THE ENGINE</div>
+        <h2 class="ps-title">12 pipelines run on every single analysis.</h2>
+        <p class="ps-sub">Not cherry-picked. Not manual. Every pipeline fires in parallel — the result is a complete picture no human researcher could produce in under 2 minutes.</p>
+      </div>
+
+      <!-- PHASE 1 -->
+      <div class="ps-phase-block">
+        <div class="ps-phase-header">
+          <div class="ps-phase-tag ps-phase-tag--1">Phase 1 — Parallel Research</div>
+          <div class="ps-phase-desc">P01–P09 run simultaneously across 4 workers. Total time: ~60–90 seconds.</div>
+        </div>
+        <div class="ps-grid">
+
+          <div class="ps-card">
+            <div class="ps-card-head">
+              <span class="ps-num">P01</span>
+              <span class="ps-icon">🏢</span>
+            </div>
+            <div class="ps-card-name">Company Overview</div>
+            <div class="ps-card-desc">Crawls the website + runs 2 Google searches for funding rounds, team size, geography and news.</div>
+            <div class="ps-outputs">
+              <div class="ps-output"><span class="ps-dot"></span>ICP fit score /100</div>
+              <div class="ps-output"><span class="ps-dot"></span>Business model + revenue range</div>
+              <div class="ps-output"><span class="ps-dot"></span>Recommended StepOneXP service</div>
+            </div>
+          </div>
+
+          <div class="ps-card">
+            <div class="ps-card-head">
+              <span class="ps-num">P02</span>
+              <span class="ps-icon">🎨</span>
+            </div>
+            <div class="ps-card-name">Brand Identity</div>
+            <div class="ps-card-desc">Fetches website CSS files, inline styles and homepage copy to extract the real brand palette.</div>
+            <div class="ps-outputs">
+              <div class="ps-output"><span class="ps-dot"></span>Primary + secondary colours (hex)</div>
+              <div class="ps-output"><span class="ps-dot"></span>Typography + brand tone</div>
+              <div class="ps-output"><span class="ps-dot"></span>Visual style + maturity score</div>
+            </div>
+          </div>
+
+          <div class="ps-card">
+            <div class="ps-card-head">
+              <span class="ps-num">P03</span>
+              <span class="ps-icon">📊</span>
+            </div>
+            <div class="ps-card-name">Market Position</div>
+            <div class="ps-card-desc">Google searches for brand sentiment, share of voice and how the market perceives them vs competitors.</div>
+            <div class="ps-outputs">
+              <div class="ps-output"><span class="ps-dot"></span>Brand sentiment (Positive/Mixed/Negative)</div>
+              <div class="ps-output"><span class="ps-dot"></span>Share of voice level</div>
+              <div class="ps-output"><span class="ps-dot"></span>Perception gap score /5</div>
+            </div>
+          </div>
+
+          <div class="ps-card">
+            <div class="ps-card-head">
+              <span class="ps-num">P04</span>
+              <span class="ps-icon">⚔️</span>
+            </div>
+            <div class="ps-card-name">Competitor Mapping</div>
+            <div class="ps-card-desc">Identifies 3–5 direct competitors, crawls their websites and analyses their experiential activity.</div>
+            <div class="ps-outputs">
+              <div class="ps-output"><span class="ps-dot"></span>Competitor list + positioning</div>
+              <div class="ps-output"><span class="ps-dot"></span>Their events activity + gap</div>
+              <div class="ps-output"><span class="ps-dot"></span>Competitive urgency verdict</div>
+            </div>
+          </div>
+
+          <div class="ps-card">
+            <div class="ps-card-head">
+              <span class="ps-num">P05</span>
+              <span class="ps-icon">📣</span>
+            </div>
+            <div class="ps-card-name">Brand Activity</div>
+            <div class="ps-card-desc">Scans PR coverage and campaign records from the last 24 months to find budget signals and timing windows.</div>
+            <div class="ps-outputs">
+              <div class="ps-output"><span class="ps-dot"></span>Recent campaigns + partnerships</div>
+              <div class="ps-output"><span class="ps-dot"></span>Budget signal (High/Medium/Low)</div>
+              <div class="ps-output"><span class="ps-dot"></span>Upcoming opportunity window</div>
+            </div>
+          </div>
+
+          <div class="ps-card">
+            <div class="ps-card-head">
+              <span class="ps-num">P06</span>
+              <span class="ps-icon">🎪</span>
+            </div>
+            <div class="ps-card-name">Experiential Footprint</div>
+            <div class="ps-card-desc">Searches event databases, sponsorship records and news coverage to map every activation they've ever done.</div>
+            <div class="ps-outputs">
+              <div class="ps-output"><span class="ps-dot"></span>Events timeline + maturity score /5</div>
+              <div class="ps-output"><span class="ps-dot"></span>Missing formats = your pitch angle</div>
+              <div class="ps-output"><span class="ps-dot"></span>Exact opening line for the pitch</div>
+            </div>
+          </div>
+
+          <div class="ps-card">
+            <div class="ps-card-head">
+              <span class="ps-num">P07</span>
+              <span class="ps-icon">💬</span>
+            </div>
+            <div class="ps-card-name">Reputation Research</div>
+            <div class="ps-card-desc">Scrapes Reddit threads, review platforms and forums to find what real consumers say — unfiltered.</div>
+            <div class="ps-outputs">
+              <div class="ps-output"><span class="ps-dot"></span>Reputation label + score /100</div>
+              <div class="ps-output"><span class="ps-dot"></span>NPS signal + community strength</div>
+              <div class="ps-output"><span class="ps-dot"></span>Risk themes + reputation opportunity</div>
+            </div>
+          </div>
+
+          <div class="ps-card">
+            <div class="ps-card-head">
+              <span class="ps-num">P08</span>
+              <span class="ps-icon">⚠️</span>
+            </div>
+            <div class="ps-card-name">Strategic Watchouts</div>
+            <div class="ps-card-desc">Scans for leadership changes, financial distress signals and controversial news that affect pitch timing.</div>
+            <div class="ps-outputs">
+              <div class="ps-output"><span class="ps-dot"></span>Green / Amber / Red verdict</div>
+              <div class="ps-output"><span class="ps-dot"></span>Pitch timing recommendation</div>
+              <div class="ps-output"><span class="ps-dot"></span>Tone adjustment guidance</div>
+            </div>
+          </div>
+
+          <div class="ps-card">
+            <div class="ps-card-head">
+              <span class="ps-num">P09</span>
+              <span class="ps-icon">👥</span>
+            </div>
+            <div class="ps-card-name">Decision Makers</div>
+            <div class="ps-card-desc">3-variant Google LinkedIn searches + company team page scraping to build a complete buying committee.</div>
+            <div class="ps-outputs">
+              <div class="ps-output"><span class="ps-dot"></span>Buying committee (up to 5 people)</div>
+              <div class="ps-output"><span class="ps-dot"></span>Role types + outreach priority</div>
+              <div class="ps-output"><span class="ps-dot"></span>Personalisation hook per person</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- DATA FLOW ARROW -->
+      <div class="ps-dataflow">
+        <div class="ps-dataflow-line"></div>
+        <div class="ps-dataflow-label">P09 buying committee feeds into P10 → P11 → P12</div>
+        <div class="ps-dataflow-line"></div>
+      </div>
+
+      <!-- PHASE 2 -->
+      <div class="ps-phase-block">
+        <div class="ps-phase-header">
+          <div class="ps-phase-tag ps-phase-tag--2">Phase 2 — Sequential Synthesis</div>
+          <div class="ps-phase-desc">P10 → P11 → P12 run sequentially, each building on the previous. Total time: ~20–40 seconds.</div>
+        </div>
+        <div class="ps-grid ps-grid--3">
+
+          <div class="ps-card ps-card--featured">
+            <div class="ps-card-head">
+              <span class="ps-num">P10</span>
+              <span class="ps-icon">📧</span>
+            </div>
+            <div class="ps-card-name">Contact Intelligence</div>
+            <div class="ps-card-desc">Takes every person from P09 and runs them through Hunter.io — finding real verified email addresses, or inferring them from domain patterns.</div>
+            <div class="ps-outputs">
+              <div class="ps-output"><span class="ps-dot"></span>Verified emails via Hunter.io</div>
+              <div class="ps-output"><span class="ps-dot"></span>Pattern-inferred emails (marked clearly)</div>
+              <div class="ps-output"><span class="ps-dot"></span>Best channel per person (email vs LinkedIn)</div>
+            </div>
+          </div>
+
+          <div class="ps-card ps-card--featured">
+            <div class="ps-card-head">
+              <span class="ps-num">P11</span>
+              <span class="ps-icon">✍️</span>
+            </div>
+            <div class="ps-card-name">Outreach Sequences</div>
+            <div class="ps-card-desc">GPT-4o writes a role-specific 4-touch sequence for every person in the buying committee — not a template, an actual piece of research-backed writing.</div>
+            <div class="ps-outputs">
+              <div class="ps-output"><span class="ps-dot"></span>Touch 1: Email (Day 1) — specific signal</div>
+              <div class="ps-output"><span class="ps-dot"></span>Touch 2: LinkedIn DM (Day 3) — one question</div>
+              <div class="ps-output"><span class="ps-dot"></span>Touch 3: Email (Day 8) — competitor angle</div>
+              <div class="ps-output"><span class="ps-dot"></span>Touch 4: Email (Day 15) — human close</div>
+            </div>
+          </div>
+
+          <div class="ps-card ps-card--featured">
+            <div class="ps-card-head">
+              <span class="ps-num">P12</span>
+              <span class="ps-icon">📈</span>
+            </div>
+            <div class="ps-card-name">Tracking Setup</div>
+            <div class="ps-card-desc">Configures an engagement scoring model for each contact — so you know who's warm based on how they interact with your outreach.</div>
+            <div class="ps-outputs">
+              <div class="ps-output"><span class="ps-dot"></span>Tracking record per contact</div>
+              <div class="ps-output"><span class="ps-dot"></span>Engagement scoring model</div>
+              <div class="ps-output"><span class="ps-dot"></span>Outreach status tracking (New / Pending / Done)</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- BOTTOM CTA -->
+      <div class="ps-cta">
+        <div class="ps-cta-text">
+          <div class="ps-cta-headline">Ready to run your first analysis?</div>
+          <div class="ps-cta-sub">Scroll back up — it takes 30 seconds to set up.</div>
+        </div>
+        <button class="btn-primary" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+          Run Analysis
+          <svg class="btn-arrow" viewBox="0 0 16 16" fill="none"><path d="M8 13V3M4 7l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
 </section>
 
 <!-- ══════════════════════════════════════════
@@ -127,8 +366,6 @@
   </div>
 
   <div class="analysis-body">
-
-    <!-- Pipeline grid -->
     <div class="pipeline-section">
       <div class="section-label">Intelligence Pipelines</div>
       <div class="pipeline-grid" id="pipelineGrid"></div>
@@ -150,14 +387,12 @@
       </div>
     </div>
 
-    <!-- Intelligence stream -->
     <div class="stream-section">
       <div class="section-label">Intelligence Stream
         <span class="stream-live-dot"></span>
       </div>
       <div class="stream-body" id="termLog"></div>
     </div>
-
   </div>
 </section>
 
@@ -165,8 +400,6 @@
      RESULTS SECTION
 ══════════════════════════════════════════ -->
 <section id="sec-results" class="section hidden">
-
-  <!-- Results header -->
   <div class="results-header" id="resultsHeader">
     <div class="results-header-inner">
       <div class="rh-left">
@@ -191,7 +424,6 @@
     </div>
   </div>
 
-  <!-- Tabs -->
   <div class="tabs-wrap">
     <div class="tabs" id="tabs">
       <button class="tab active" data-tab="overview">Overview</button>
@@ -204,9 +436,7 @@
     </div>
   </div>
 
-  <!-- Tab panels -->
   <div class="panels-wrap">
-
     <div class="panel active" id="panel-overview">
       <div class="overview-grid">
         <div class="card" id="card-icp-score"></div>
@@ -253,7 +483,6 @@
         <div class="card card-full" id="card-tracking"></div>
       </div>
     </div>
-
   </div>
 </section>
 

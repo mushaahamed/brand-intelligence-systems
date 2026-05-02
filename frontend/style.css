@@ -824,6 +824,202 @@ a:hover { color: #6EFFA0; }
 }
 @keyframes toastIn { from { opacity:0; transform:translateX(-50%) translateY(6px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
 
+/* ════════════════════════════════════════════════════
+   HOMEPAGE — PIPELINE SHOWCASE
+════════════════════════════════════════════════════ */
+
+/* Glow blobs on hero */
+.hero-glow {
+  position: absolute; border-radius: 50%; filter: blur(120px);
+  pointer-events: none; z-index: 0;
+}
+.hero-glow--1 {
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(0,230,118,.07) 0%, transparent 70%);
+  top: -100px; right: -100px;
+}
+.hero-glow--2 {
+  width: 400px; height: 400px;
+  background: radial-gradient(circle, rgba(59,130,246,.05) 0%, transparent 70%);
+  bottom: 50px; left: 100px;
+}
+
+/* Scroll hint */
+.hero-scroll-hint {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 20px; cursor: pointer;
+  font-size: 12px; color: var(--text-3);
+  transition: color .15s;
+  animation: bounce-hint 2.5s ease-in-out infinite;
+}
+.hero-scroll-hint:hover { color: var(--indigo); }
+@keyframes bounce-hint {
+  0%,100% { transform: translateY(0); }
+  50% { transform: translateY(4px); }
+}
+
+/* ── Pipeline Showcase Wrapper ── */
+.pipeline-showcase {
+  background: linear-gradient(180deg, #060C1A 0%, #0B0F1A 20%, #070D1C 100%);
+  border-top: 1px solid var(--border);
+}
+
+.ps-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 96px 32px 80px;
+}
+
+@media (max-width: 768px) { .ps-inner { padding: 64px 20px 60px; } }
+
+/* ── Section header ── */
+.ps-header {
+  text-align: center; max-width: 720px; margin: 0 auto 72px;
+}
+.ps-eyebrow {
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--indigo); margin-bottom: 16px;
+}
+.ps-title {
+  font-size: clamp(28px, 4vw, 44px); font-weight: 700;
+  color: var(--text); letter-spacing: -.03em; line-height: 1.15;
+  margin-bottom: 16px;
+}
+.ps-sub {
+  font-size: 16px; color: var(--text-2); line-height: 1.75;
+}
+
+/* ── Phase block ── */
+.ps-phase-block { margin-bottom: 48px; }
+
+.ps-phase-header {
+  display: flex; align-items: center; gap: 16px;
+  margin-bottom: 24px; flex-wrap: wrap;
+}
+.ps-phase-tag {
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  letter-spacing: .05em; padding: 5px 14px; border-radius: 100px;
+  white-space: nowrap;
+}
+.ps-phase-tag--1 {
+  background: rgba(0,230,118,.12); color: var(--indigo);
+  border: 1px solid rgba(0,230,118,.25);
+}
+.ps-phase-tag--2 {
+  background: rgba(59,130,246,.1); color: #60A5FA;
+  border: 1px solid rgba(59,130,246,.2);
+}
+.ps-phase-desc {
+  font-size: 13px; color: var(--text-3);
+}
+
+/* ── Grid ── */
+.ps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.ps-grid--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+@media (max-width: 1100px) { .ps-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px)  { .ps-grid, .ps-grid--3 { grid-template-columns: 1fr; } }
+
+/* ── Pipeline card ── */
+.ps-card {
+  background: var(--bg-1); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 22px 22px 20px;
+  display: flex; flex-direction: column; gap: 12px;
+  transition: border-color .2s, box-shadow .2s, transform .2s;
+  position: relative; overflow: hidden;
+}
+.ps-card::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  background: linear-gradient(135deg, rgba(0,230,118,.04) 0%, transparent 60%);
+  opacity: 0; transition: opacity .2s;
+}
+.ps-card:hover {
+  border-color: rgba(0,230,118,.3);
+  box-shadow: 0 0 30px rgba(0,230,118,.06), 0 8px 24px rgba(0,0,0,.3);
+  transform: translateY(-2px);
+}
+.ps-card:hover::before { opacity: 1; }
+
+.ps-card--featured {
+  border-color: rgba(0,230,118,.2);
+  background: linear-gradient(135deg, rgba(0,230,118,.05) 0%, var(--bg-1) 50%);
+}
+.ps-card--featured:hover { border-color: rgba(0,230,118,.4); }
+
+/* Card head */
+.ps-card-head {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.ps-num {
+  font-family: var(--mono); font-size: 10px; font-weight: 600;
+  letter-spacing: .08em; color: var(--indigo);
+  background: var(--indigo-dim); border: 1px solid var(--indigo-border);
+  padding: 3px 9px; border-radius: 4px;
+}
+.ps-icon { font-size: 20px; line-height: 1; }
+
+/* Card name */
+.ps-card-name {
+  font-size: 16px; font-weight: 600; color: var(--text);
+  letter-spacing: -.01em; line-height: 1.2;
+}
+
+/* Card description */
+.ps-card-desc {
+  font-size: 13px; color: var(--text-2); line-height: 1.65;
+}
+
+/* Outputs list */
+.ps-outputs {
+  display: flex; flex-direction: column; gap: 6px;
+  padding-top: 4px; border-top: 1px solid var(--border);
+}
+.ps-output {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--text-3); line-height: 1.4;
+}
+.ps-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--indigo); flex-shrink: 0; opacity: .6;
+}
+
+/* ── Data flow connector ── */
+.ps-dataflow {
+  display: flex; align-items: center; gap: 16px;
+  margin: 8px 0 48px;
+}
+.ps-dataflow-line {
+  flex: 1; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-2), transparent);
+}
+.ps-dataflow-label {
+  font-family: var(--mono); font-size: 11px; color: var(--text-3);
+  white-space: nowrap; padding: 5px 14px;
+  background: var(--bg-2); border: 1px solid var(--border-2);
+  border-radius: 100px; letter-spacing: .03em;
+}
+
+/* ── Bottom CTA ── */
+.ps-cta {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 24px; flex-wrap: wrap;
+  margin-top: 64px; padding: 32px 36px;
+  background: var(--bg-1); border: 1px solid var(--border-2);
+  border-radius: var(--radius-lg);
+  background-image: linear-gradient(135deg, rgba(0,230,118,.05) 0%, transparent 60%);
+}
+.ps-cta-headline {
+  font-size: 20px; font-weight: 600; color: var(--text); letter-spacing: -.015em;
+}
+.ps-cta-sub { font-size: 13px; color: var(--text-3); margin-top: 4px; }
+.ps-cta .btn-primary { white-space: nowrap; }
+
 /* ── PRINT STYLES ── */
 @media print {
   nav, .results-header, .tabs-wrap, .rh-actions, .btn-ghost, .btn-primary,
