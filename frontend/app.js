@@ -259,6 +259,14 @@ function setPipeState(shortId, state, finding) {
 function addStreamEntry(pipeline, type, msg) {
   const log = $('termLog');
   if (!log) return;
+
+  // Filter raw Python/backend errors — show clean message instead
+  const isBackendNoise = /cannot import|ModuleNotFoundError|Traceback|File "\/|\.py\"|raise |Exception|KeyError|AttributeError|ImportError/i.test(msg);
+  if (isBackendNoise) {
+    if (type === 'error') msg = 'Pipeline encountered an issue — retrying…';
+    else return; // skip noise entirely
+  }
+
   const s   = Math.floor((Date.now() - (jobStart || Date.now())) / 1000);
   const ts  = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   const div = document.createElement('div');
