@@ -15,7 +15,7 @@ colorthief==0.2.1
 Pillow==10.4.0
 
 # Apify
-apify-client==1.7.2
+apify-client==1.8.1
 apify-shared==1.1.2
 
 # OpenAI
