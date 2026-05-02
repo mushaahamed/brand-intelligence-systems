@@ -28,6 +28,8 @@ SYSTEM_PROMPT = """You are a B2B sales intelligence analyst for StepOneXP, an ex
 
 From the raw Google search results and company page text below, identify the best people to contact for an experiential marketing pitch.
 
+IMPORTANT: Some brands are product lines owned by larger companies (e.g. Dove → Hindustan Unilever, Gillette → P&G, Maggi → Nestlé India). If you see results pointing to a parent company, include those people — they are the ones who actually approve marketing spend for the brand.
+
 Focus on: CMO, VP/SVP/AVP Marketing, Head of Marketing, Brand Director/Manager, Events Manager, CEO/Founder, Head of Growth, Head of Brand, Category Manager, Head of Consumer Marketing — anyone who could approve or influence experiential marketing spend.
 
 Return ONLY valid JSON, no markdown fences:
@@ -36,6 +38,7 @@ Return ONLY valid JSON, no markdown fences:
     {
       "name": "Full Name",
       "title": "Their exact title",
+      "company": "Company they work at (may be parent company)",
       "role_type": "Economic Buyer | Initiator | Events Specialist | Influencer",
       "company_tenure_months": null,
       "linkedin_url": "https://linkedin.com/in/... or null",
@@ -46,6 +49,7 @@ Return ONLY valid JSON, no markdown fences:
     }
   ],
   "primary_contact": "Name of single best person to contact first",
+  "parent_company": "Parent company name if brand is a product line, else null",
   "total_contacts_found": 3,
   "confidence_level": "HIGH | MEDIUM | LOW",
   "committee_gap": "Which role is missing, or None"
@@ -58,7 +62,8 @@ Rules:
 - decision_relevance_score: 5 = owns events budget, 1 = peripheral
 - linkedin_url: extract the full URL if visible in the search result
 - If a result is from LinkedIn (in.linkedin.com or www.linkedin.com), the person IS at or was at the company
-- Only include people who genuinely appear to be at this company"""
+- Only include people who genuinely appear to be at this company OR its parent company
+- For product brands (Dove/HUL, Gillette/P&G, Maggi/Nestlé etc), search parent company people managing this brand"""
 
 
 def _scrape_team_page(company_url: str) -> str:
@@ -91,11 +96,13 @@ class DecisionMakersPipeline(BasePipeline):
         n   = self.company_name
         raw = {"google_results": [], "team_page": ""}
 
-        # 3 parallel Google searches — broad enough to catch any title format
+        # 4 parallel Google searches — broad enough to catch any title format
+        # Query 4 handles product brands (Dove → search "Dove brand Hindustan Unilever")
         queries = [
             f"{n} marketing leadership CMO \"head of\" OR \"VP\" OR \"SVP\" OR \"AVP\" site:linkedin.com",
             f"{n} \"brand manager\" OR \"marketing manager\" OR \"events manager\" OR \"head of marketing\" linkedin",
             f"{n} marketing team director manager linkedin profile",
+            f"{n} brand marketing India linkedin \"brand\" OR \"category\" OR \"portfolio\"",
         ]
         raw["google_results"] = run_google_searches_parallel(queries, PIPELINE_ID, num_results=8)
         log.info("p09_google_done", results=len(raw["google_results"]))
@@ -131,18 +138,23 @@ class DecisionMakersPipeline(BasePipeline):
     def synthesise(self, structured: dict) -> dict:
         n = structured["company_name"]
 
-        user_prompt = f"""COMPANY: {n}
+        user_prompt = f"""COMPANY / BRAND: {n}
 CATEGORY: {structured['category']}
 WEBSITE: {self.company_url}
 
-GOOGLE SEARCH RESULTS ({structured['result_count']} results across 3 queries about {n}'s marketing team):
+NOTE: If "{n}" is a product brand owned by a larger company (e.g. Dove → Hindustan Unilever,
+Gillette → P&G India, Maggi → Nestlé India, Horlicks → HUL, etc.), look for people at the
+PARENT company who manage this brand. They are the real decision-makers for marketing spend.
+
+GOOGLE SEARCH RESULTS ({structured['result_count']} results across 4 queries about {n}'s marketing team):
 {structured['search_text']}
 
 COMPANY TEAM/ABOUT PAGE TEXT:
 {structured['team_page'] or '(not found)'}
 
 Extract the buying committee for {n}. Focus on marketing, brand, events, and growth leadership.
-LinkedIn URLs are in the RESULT lines — extract them if present."""
+LinkedIn URLs are in the RESULT lines — extract them if present.
+If no contacts are found, return your best inference based on company type and category — do NOT return empty."""
 
         result = synthesise(SYSTEM_PROMPT, user_prompt, max_tokens=1500)
         if result:

@@ -659,7 +659,7 @@ function renderPeopleCard(p09, p10) {
         ${cards || '<div style="color:var(--text-3);padding:16px 0;font-family:var(--mono);font-size:12px">No decision makers found</div>'}
       </div>
       ${p10.email_pattern ? `<div class="email-pattern-bar">
-        Email pattern: <strong style="color:var(--indigo)">${esc(p10.email_pattern)}@${esc(p10.domain || '?')}</strong>
+        Email pattern: <strong style="color:var(--indigo)">${esc(p10.email_pattern)}</strong>
         <span>· ${p10.verified_emails || 0} verified</span>
         <span>· ${p10.inferred_emails || 0} inferred</span>
       </div>` : ''}
@@ -1252,7 +1252,7 @@ function buildPDFHTML(data) {
 <div class="pb" style="padding:40px">
   ${pdfSection('Decision Makers & Contact Intelligence', `
     ${peopleCards || '<div style="color:#6B7280;font-family:monospace;font-size:12px">No decision makers found</div>'}
-    ${p10.email_pattern ? `<div style="margin-top:12px;padding:10px 12px;background:#111827;border:1px solid #1F2937;border-radius:4px;font-family:monospace;font-size:11px;color:#6B7280">Email pattern: <span style="color:#00E676">${e(p10.email_pattern)}@${e(p10.domain || '?')}</span> · ${p10.verified_emails || 0} verified · ${p10.inferred_emails || 0} inferred</div>` : ''}
+    ${p10.email_pattern ? `<div style="margin-top:12px;padding:10px 12px;background:#111827;border:1px solid #1F2937;border-radius:4px;font-family:monospace;font-size:11px;color:#6B7280">Email pattern: <span style="color:#00E676">${e(p10.email_pattern)}</span> · ${p10.verified_emails || 0} verified · ${p10.inferred_emails || 0} inferred</div>` : ''}
   `)}
 
   ${pdfSection('Strategic Watchouts', `
