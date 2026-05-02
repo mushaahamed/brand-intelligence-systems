@@ -1,36 +1,33 @@
 """
 Pipeline 03 — Market Position
-===============================
-Layer 1: Google search for brand mentions, news, "vs" queries, reviews
-Layer 2: Extract share of voice signals, sentiment from headlines, perception gap
-Layer 3: Claude synthesises market position assessment
+Fast version: 2 parallel Google searches.
 """
-import json, re, structlog
+import structlog
 from pipelines.base import BasePipeline
-from utils.apify_client import run_google_search, run_actor
+from utils.apify_client import run_google_searches_parallel
 from utils.claude_client import synthesise
-from utils.helpers import safe_json_parse, truncate, clean_text
+from utils.helpers import safe_json_parse
 
 log = structlog.get_logger()
 PIPELINE_ID = "p03_market_position"
 
-SYSTEM_PROMPT = """You are a brand strategist. Analyse the search results and news snippets provided to assess this brand's market position.
+SYSTEM_PROMPT = """You are a brand strategist. Analyse the search results to assess this brand's market position.
 
 Return ONLY valid JSON:
 {
   "share_of_voice_level": "HIGH | MEDIUM | LOW",
-  "share_of_voice_reasoning": "1-2 sentences with evidence",
+  "share_of_voice_reasoning": "1-2 sentences",
   "brand_sentiment": "POSITIVE | NEUTRAL | NEGATIVE | MIXED",
-  "sentiment_signals": ["up to 3 specific examples from headlines"],
-  "self_positioning_keywords": ["how the brand describes itself - from search results"],
+  "sentiment_signals": ["up to 3 examples from headlines"],
+  "self_positioning_keywords": ["how the brand describes itself"],
   "market_perception_keywords": ["how external sources describe the brand"],
   "perception_gap_score": 1,
   "perception_gap_reasoning": "1-5 scale: 1=fully aligned, 5=major gap",
   "category_leadership_claim": true,
   "leadership_claim_verified": false,
   "recent_sentiment_shift": "IMPROVING | STABLE | DECLINING | UNKNOWN",
-  "market_position_summary": "2-3 sentences — specific, no generic statements",
-  "pitch_implication": "What this means for how StepOneXP should position their pitch"
+  "market_position_summary": "2-3 sentences",
+  "pitch_implication": "What this means for StepOneXP pitch"
 }"""
 
 
@@ -40,17 +37,11 @@ class MarketPositionPipeline(BasePipeline):
 
     def fetch(self) -> dict:
         n = self.company_name
-        raw = {"search_results": []}
         queries = [
-            f"{n} brand review OR perception OR reputation",
-            f"{n} vs competitors market",
-            f"{n} news 2024 2025",
-            f'"{n}" marketing campaign OR launch',
+            f"{n} brand review perception reputation 2024 2025",
+            f"{n} vs competitors market news campaign",
         ]
-        for q in queries:
-            results = run_google_search(q, PIPELINE_ID, num_results=8)
-            raw["search_results"].extend(results)
-        return raw
+        return {"search_results": run_google_searches_parallel(queries, PIPELINE_ID, num_results=8)}
 
     def extract(self, raw: dict) -> dict:
         snippets, titles = [], []
@@ -59,20 +50,14 @@ class MarketPositionPipeline(BasePipeline):
             s = item.get("snippet") or item.get("description", "")
             if t: titles.append(t)
             if s: snippets.append(f"{t}: {s}")
-        return {
-            "company_name": self.company_name,
-            "titles":    titles[:20],
-            "snippets":  snippets[:15],
-        }
+        return {"company_name": self.company_name, "titles": titles[:20], "snippets": snippets[:15]}
 
     def synthesise(self, structured: dict) -> dict:
         user_data = f"""
 COMPANY: {structured['company_name']}
 CATEGORY: {self.category}
-
 SEARCH RESULT HEADLINES:
 {chr(10).join(structured['titles'][:15])}
-
 FULL SNIPPETS:
 {chr(10).join(structured['snippets'][:10])}
 """
@@ -80,4 +65,8 @@ FULL SNIPPETS:
         if result:
             parsed = safe_json_parse(result)
             if parsed: return parsed
-        return {"brand_sentiment": "UNKNOWN", "market_position_summary": "Insufficient data", "pitch_implication": "Manual review needed"}
+        return {
+            "brand_sentiment": "UNKNOWN",
+            "market_position_summary": "Insufficient data",
+            "pitch_implication": "Manual review needed",
+        }

@@ -17,12 +17,10 @@ import uuid, hashlib, structlog
 from datetime import datetime
 from pipelines.base import BasePipeline
 from utils.helpers import timestamp
+from config.settings import TRACKING_BASE
 
 log = structlog.get_logger()
 PIPELINE_ID = "p12_tracking"
-
-# Base URL for the tracking server (update with your deployed API URL)
-TRACKING_BASE = "https://your-api-domain.com/track"
 
 
 def _make_tracking_id(company: str, contact_name: str, touch: int) -> str:

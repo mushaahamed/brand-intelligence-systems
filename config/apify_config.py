@@ -47,8 +47,8 @@ TOKEN_GROUP_MAP = {
 # ─── DEFAULT RUN INPUT CONFIGS ─────────────────────────────────────────────────
 ACTOR_DEFAULTS = {
     "website_crawler": {
-        "maxCrawlDepth": 2,
-        "maxCrawlPages": 8,
+        "maxCrawlDepth": 1,
+        "maxCrawlPages": 4,
         "useSitemaps": False,
         "saveHtml": False,
         "saveMarkdown": True,

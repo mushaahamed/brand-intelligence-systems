@@ -1,72 +1,58 @@
 """
-Claude API client — handles all LLM calls across the system.
-Uses Haiku for fast classification/extraction, Sonnet for outreach writing.
+OpenAI API client — drop-in replacement for the former Claude client.
+All function signatures are identical so no pipeline code changes are needed.
+Uses gpt-4o-mini for fast synthesis/extraction, gpt-4o for outreach writing.
 """
-import anthropic
 import structlog
 from typing import Optional
-from config.settings import ANTHROPIC_API_KEY, CLAUDE_MODEL, CLAUDE_MODEL_FULL
+from config.settings import OPENAI_API_KEY, OPENAI_MODEL, OPENAI_MODEL_FULL
 
 log = structlog.get_logger()
 
-# Lazy-initialise the client so imports never fail when no key is set.
-# The client is created on first use inside each function.
-_client: Optional["anthropic.Anthropic"] = None
+_client = None
 
-def _get_client() -> "anthropic.Anthropic":
+
+def _get_client():
     global _client
     if _client is None:
-        _client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        from openai import OpenAI
+        _client = OpenAI(api_key=OPENAI_API_KEY)
     return _client
 
 
 def synthesise(
     system_prompt: str,
     user_data: str,
-    model: str = CLAUDE_MODEL,
+    model: str = None,
     max_tokens: int = 2048,
     temperature: float = 0.3,
 ) -> Optional[str]:
     """
-    Core synthesis call. Sends structured data to Claude and returns text output.
-
-    Args:
-        system_prompt: Role + instructions for the synthesis task
-        user_data:     Pre-structured data from Layer 2 extraction
-        model:         Which Claude model to use
-        max_tokens:    Max output tokens
-        temperature:   Lower = more deterministic (0.3 is good for analysis)
-
-    Returns:
-        Synthesised text string, or None on failure
+    Core synthesis call. Sends structured data to OpenAI and returns text output.
+    Drop-in replacement for the former Claude synthesise() function.
     """
+    if model is None:
+        model = OPENAI_MODEL
     try:
-        response = _get_client().messages.create(
+        response = _get_client().chat.completions.create(
             model=model,
             max_tokens=max_tokens,
             temperature=temperature,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_data}]
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_data},
+            ],
         )
-        result = response.content[0].text
-        log.info("claude_synthesis_ok", model=model, tokens=response.usage.output_tokens)
+        result = response.choices[0].message.content
+        log.info("openai_ok", model=model, tokens=response.usage.completion_tokens)
         return result
-    except anthropic.AuthenticationError:
-        log.error("claude_auth_error", hint="Check ANTHROPIC_API_KEY in .env")
-        return None
-    except anthropic.RateLimitError:
-        log.error("claude_rate_limit")
-        return None
     except Exception as e:
-        log.error("claude_error", error=str(e))
+        log.error("openai_error", error=str(e), model=model)
         return None
 
 
-def classify(text: str, categories: list[str], context: str = "") -> Optional[str]:
-    """
-    Fast classification — returns one of the provided categories.
-    Used for: business model type, sentiment, brand maturity score, etc.
-    """
+def classify(text: str, categories: list, context: str = "") -> Optional[str]:
+    """Fast classification — returns one of the provided categories."""
     category_list = " | ".join(categories)
     prompt = f"""Classify the following text into exactly one category.
 Categories: {category_list}
@@ -75,12 +61,11 @@ Return ONLY the category name, nothing else."""
 
     result = synthesise(prompt, text, max_tokens=50, temperature=0)
     if result:
-        # Find closest match
         result = result.strip()
         for cat in categories:
             if cat.lower() in result.lower():
                 return cat
-    return categories[-1]   # Default to last category
+    return categories[-1]
 
 
 def extract_json(
@@ -89,14 +74,15 @@ def extract_json(
     instruction: str = "",
     data: str = "",
     schema_hint: str = "",
-    model: str = CLAUDE_MODEL,
+    model: str = None,
 ) -> Optional[dict]:
     """
     Extract structured JSON from unstructured text.
     Accepts either (system, user) or (instruction, data) kwargs.
     Returns parsed dict, or None on failure.
     """
-    # normalise args — support both call styles
+    if model is None:
+        model = OPENAI_MODEL
     sys_prompt = system or f"""You are a precise data extraction engine.
 Extract information from the provided text and return ONLY valid JSON.
 {f'Expected JSON structure: {schema_hint}' if schema_hint else ''}
@@ -132,4 +118,4 @@ Rules:
 - Do not fabricate data
 - Keep text values under 200 characters"""
 
-    return synthesise(system, f"{
+    return synthesise(system, f"{instruction}\n\nData:\n{data}")

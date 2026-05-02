@@ -17,7 +17,6 @@ sys.path.insert(0, str(ROOT))
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 def load_env():
-    """Load .env if python-dotenv is available, else fall back to os.environ."""
     try:
         from dotenv import load_dotenv
         load_dotenv(ROOT / ".env")
@@ -36,10 +35,10 @@ class TestConfig:
         assert (ROOT / ".env").exists() or (ROOT / ".env.example").exists(), \
             ".env file missing — copy .env.example and fill in your keys"
 
-    def test_anthropic_key_present(self):
-        key = os.getenv("ANTHROPIC_API_KEY", "")
-        assert key, "ANTHROPIC_API_KEY is not set in .env"
-        assert key.startswith("sk-ant-"), "ANTHROPIC_API_KEY looks malformed"
+    def test_openai_key_present(self):
+        key = os.getenv("OPENAI_API_KEY", "")
+        assert key, "OPENAI_API_KEY is not set in .env"
+        assert key.startswith("sk-"), "OPENAI_API_KEY looks malformed"
 
     def test_at_least_one_apify_token(self):
         tokens = [os.getenv(f"APIFY_TOKEN_{i}", "") for i in range(1, 6)]
@@ -51,8 +50,8 @@ class TestConfig:
         assert key, "HUNTER_API_KEY is not set — email lookup will fall back to pattern inference"
 
     def test_settings_import(self):
-        from config.settings import CLAUDE_MODEL, APIFY_TOKENS
-        assert CLAUDE_MODEL, "CLAUDE_MODEL not defined in settings"
+        from config.settings import OPENAI_MODEL, APIFY_TOKENS
+        assert OPENAI_MODEL, "OPENAI_MODEL not defined in settings"
         assert isinstance(APIFY_TOKENS, dict), "APIFY_TOKENS should be a dict"
 
     def test_apify_config_import(self):
@@ -64,19 +63,19 @@ class TestConfig:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ANTHROPIC API TEST
+# OPENAI API TEST
 # ─────────────────────────────────────────────────────────────────────────────
-class TestAnthropicAPI:
-    def test_haiku_simple_call(self):
-        """Verify Anthropic key works with a minimal Haiku call."""
-        import anthropic
-        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        msg = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+class TestOpenAIAPI:
+    def test_simple_call(self):
+        """Verify OpenAI key works with a minimal gpt-4o-mini call."""
+        from openai import OpenAI
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        msg = client.chat.completions.create(
+            model="gpt-4o-mini",
             max_tokens=32,
             messages=[{"role": "user", "content": "Reply with the word PONG only."}],
         )
-        text = msg.content[0].text.strip()
+        text = msg.choices[0].message.content.strip()
         assert "PONG" in text.upper(), f"Unexpected response: {text}"
 
     def test_json_extraction(self):
@@ -85,7 +84,6 @@ class TestAnthropicAPI:
         result = extract_json(
             system="Return JSON only.",
             user='Return exactly: {"status": "ok"}',
-            model="claude-haiku-4-5-20251001",
         )
         assert isinstance(result, dict)
         assert result.get("status") == "ok"
@@ -98,7 +96,6 @@ class TestApifyAPI:
     def test_token_format(self):
         token = os.getenv("APIFY_TOKEN_1", "")
         assert token, "APIFY_TOKEN_1 not set"
-        # Apify tokens are typically 40+ chars
         assert len(token) >= 20, "APIFY_TOKEN_1 looks too short"
 
     def test_apify_user_endpoint(self):
@@ -114,7 +111,7 @@ class TestApifyAPI:
         assert resp.status_code == 200, f"Apify auth failed: {resp.status_code} — {resp.text[:200]}"
         data = resp.json()
         assert "data" in data
-        print(f"\n  ✓ Apify user: {data['data'].get('username')}")
+        print(f"\n  Apify user: {data['data'].get('username')}")
 
     def test_google_search_actor_exists(self):
         """Confirm the google-search-scraper actor is accessible."""
@@ -136,7 +133,6 @@ class TestApifyAPI:
 # ─────────────────────────────────────────────────────────────────────────────
 class TestHunterAPI:
     def test_hunter_account_info(self):
-        """Check Hunter.io key is valid and show remaining quota."""
         key = os.getenv("HUNTER_API_KEY", "")
         if not key:
             pytest.skip("HUNTER_API_KEY not set")
@@ -149,10 +145,9 @@ class TestHunterAPI:
         data = resp.json()
         assert "data" in data
         remaining = data["data"].get("requests", {}).get("searches", {}).get("available", "?")
-        print(f"\n  ✓ Hunter.io OK — searches remaining this month: {remaining}")
+        print(f"\n  Hunter.io OK — searches remaining this month: {remaining}")
 
     def test_hunter_domain_search(self):
-        """Run a real (free) domain search against a known public company."""
         key = os.getenv("HUNTER_API_KEY", "")
         if not key:
             pytest.skip("HUNTER_API_KEY not set")
@@ -270,5 +265,5 @@ class TestSmoke:
         )
         result = p.run()
         assert result["status"] != "error", f"Pipeline error: {result.get('error')}"
-        assert "icp_fit_score" in result["data"]
-        print(f"\n  ICP Score: {result['data']['icp_fit_score']}")
+        assert "icp_fit_score" in result["output"]
+        print(f"\n  ICP Score: {result['output']['icp_fit_score']}")

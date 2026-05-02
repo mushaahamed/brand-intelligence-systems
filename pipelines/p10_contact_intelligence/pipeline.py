@@ -10,7 +10,6 @@ Never presents fabricated data as real.
 """
 import json, re, structlog
 from pipelines.base import BasePipeline
-from utils.apify_client import scrape_linkedin_profiles
 from utils.hunter_client import find_email, get_domain_pattern
 from utils.helpers import safe_json_parse, extract_domain, normalise_url
 

@@ -1,20 +1,17 @@
 """
 Pipeline 05 — Brand Activity (Last 12-24 Months)
-==================================================
-Layer 1: Google News + Instagram scrape + Google search for campaigns/launches
-Layer 2: Build chronological activity timeline with type/channel/date classification
-Layer 3: Synthesise activity pattern, budget signal, seasonal hooks, silence gaps
+Fast version: 2 parallel Google searches. Instagram actor removed (unreliable + slow).
 """
-import json, structlog
+import structlog
 from pipelines.base import BasePipeline
-from utils.apify_client import run_google_search, run_actor
+from utils.apify_client import run_google_searches_parallel
 from utils.claude_client import synthesise
-from utils.helpers import safe_json_parse, truncate, clean_text
+from utils.helpers import safe_json_parse, truncate
 
 log = structlog.get_logger()
 PIPELINE_ID = "p05_brand_activity"
 
-SYSTEM_PROMPT = """You are a brand activity analyst. Review the news, social, and PR data and produce a structured brand activity report.
+SYSTEM_PROMPT = """You are a brand activity analyst. Review the news and PR data and produce a structured brand activity report.
 
 Return ONLY valid JSON:
 {
@@ -30,10 +27,10 @@ Return ONLY valid JSON:
   "budget_signal": "HIGH | MEDIUM | LOW",
   "budget_signal_reasoning": "Evidence for budget assessment",
   "last_major_campaign": "Name and approximate date of most recent campaign",
-  "upcoming_opportunity_window": "When is the next likely activation window based on their pattern",
+  "upcoming_opportunity_window": "When is the next likely activation window",
   "activity_summary": "2-3 sentences on their marketing cadence and style"
 }
-Rules: Only include activities you can confirm from the data. Use approximate dates if exact not available. Never fabricate campaign names."""
+Only include activities confirmed from the data. Never fabricate campaign names."""
 
 
 class BrandActivityPipeline(BasePipeline):
@@ -41,26 +38,12 @@ class BrandActivityPipeline(BasePipeline):
     pipeline_name = "Brand Activity (12-24 Months)"
 
     def fetch(self) -> dict:
-        n   = self.company_name
-        raw = {"news": [], "instagram": [], "social": []}
+        n = self.company_name
         queries = [
-            f"{n} campaign launch marketing 2024 2025",
-            f"{n} advertising event activation brand",
-            f"{n} partnership collaboration 2024 2025",
-            f'"{n}" press release OR award OR recognition',
+            f"{n} campaign launch marketing event 2024 2025",
+            f"{n} partnership collaboration advertising PR 2024 2025",
         ]
-        for q in queries:
-            raw["news"].extend(run_google_search(q, PIPELINE_ID, num_results=8))
-
-        # Try Instagram scrape for social cadence
-        handle_guess = self.company_name.lower().replace(" ", "")
-        instagram_data = run_actor(
-            "instagram_scraper",
-            {"usernames": [handle_guess], "resultsLimit": 15, "searchType": "user"},
-            PIPELINE_ID, timeout_secs=60
-        )
-        raw["instagram"] = instagram_data or []
-        return raw
+        return {"news": run_google_searches_parallel(queries, PIPELINE_ID, num_results=10)}
 
     def extract(self, raw: dict) -> dict:
         activity_items = []
@@ -70,29 +53,14 @@ class BrandActivityPipeline(BasePipeline):
             d = item.get("date") or item.get("publishedAt", "")
             if t:
                 activity_items.append(f"[{d}] {t}: {s}")
-
-        instagram_info = []
-        for post in raw.get("instagram", [])[:10]:
-            caption = post.get("caption") or post.get("text", "")
-            ts      = post.get("timestamp") or post.get("date", "")
-            if caption:
-                instagram_info.append(f"[{ts}] {truncate(caption, 100)}")
-
-        return {
-            "company_name":    self.company_name,
-            "activity_items":  activity_items[:20],
-            "instagram_posts": instagram_info[:8],
-        }
+        return {"company_name": self.company_name, "activity_items": activity_items[:20]}
 
     def synthesise(self, structured: dict) -> dict:
         user_data = f"""COMPANY: {structured['company_name']}
 CATEGORY: {self.category}
 
-NEWS & PR ACTIVITY (chronological):
-{chr(10).join(structured['activity_items'])}
-
-INSTAGRAM POSTS:
-{chr(10).join(structured['instagram_posts']) if structured['instagram_posts'] else 'No Instagram data retrieved'}
+NEWS & PR ACTIVITY:
+{chr(10).join(structured['activity_items']) if structured['activity_items'] else 'No activity data retrieved.'}
 """
         result = synthesise(SYSTEM_PROMPT, user_data, max_tokens=1000)
         if result:
