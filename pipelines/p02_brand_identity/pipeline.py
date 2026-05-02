@@ -46,8 +46,11 @@ THEME_COLOR_RE = re.compile(
 )
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
 }
+
+STYLE_BLOCK_RE = re.compile(r'<style[^>]*>(.*?)</style>', re.DOTALL | re.I)
 
 # ── Third-party color signatures (never brand colors) ─────────────────────────
 THIRD_PARTY_COLORS = {
@@ -233,6 +236,98 @@ def _extract_general_colors(css_text: str, html: str) -> list[str]:
     return [c for c, _ in sorted(counts.items(), key=lambda x: -x[1])][:10]
 
 
+def _extract_inline_style_colors(html: str) -> list[str]:
+    """
+    Parse colors from <style> blocks embedded in the HTML.
+    Modern JS-heavy sites (Shopify, Next.js) often put their brand CSS here
+    rather than in separate linked CSS files.
+    """
+    all_inline = "\n".join(STYLE_BLOCK_RE.findall(html))
+    if not all_inline:
+        return []
+    return _extract_general_colors(all_inline, "")
+
+
+def _find_logo_url(html: str, base_url: str) -> str | None:
+    """
+    Find the brand logo image URL from the page.
+    Priority: apple-touch-icon > og:image > img[class*=logo] > first SVG/PNG with 'logo' in name
+    """
+    soup = BeautifulSoup(html, "lxml")
+
+    # 1. apple-touch-icon — always a brand icon
+    for link in soup.find_all("link", rel=True):
+        rels = link.get("rel", [])
+        if isinstance(rels, list):
+            rels = " ".join(rels)
+        if "apple-touch-icon" in rels:
+            href = link.get("href", "")
+            if href:
+                return href if href.startswith("http") else urljoin(base_url, href)
+
+    # 2. og:image — often the brand logo or hero image
+    meta_og = soup.find("meta", property="og:image")
+    if meta_og and meta_og.get("content"):
+        return meta_og["content"]
+
+    # 3. img with logo in class, id, alt, or src
+    for img in soup.find_all("img"):
+        src = img.get("src", "") or img.get("data-src", "")
+        alt = img.get("alt", "")
+        cls = " ".join(img.get("class", []))
+        _id = img.get("id", "")
+        if any("logo" in x.lower() for x in [src, alt, cls, _id]):
+            if src:
+                return src if src.startswith("http") else urljoin(base_url, src)
+
+    return None
+
+
+def _extract_logo_colors(logo_url: str) -> list[str]:
+    """Download logo image and extract dominant colors via colorthief."""
+    if not logo_url:
+        return []
+    try:
+        from colorthief import ColorThief
+        from io import BytesIO
+        from PIL import Image
+
+        r = requests.get(logo_url, timeout=8, headers=HEADERS, stream=True)
+        if r.status_code != 200:
+            return []
+
+        content_type = r.headers.get("content-type", "")
+        # Accept images and SVGs
+        if "image" not in content_type and "svg" not in content_type:
+            return []
+        if "svg" in content_type or logo_url.lower().endswith(".svg"):
+            # SVG — extract hex colors directly from markup
+            svg_text = r.text
+            seen = set()
+            results = []
+            for m in HEX_RE.finditer(svg_text):
+                h = _norm_hex("#" + m.group(1))
+                if h and h not in seen and not _is_boring(h) and h not in THIRD_PARTY_COLORS:
+                    seen.add(h); results.append(h)
+            return results[:5]
+
+        # Raster image — use colorthief
+        img_data = BytesIO(r.content)
+        ct = ColorThief(img_data)
+        palette = ct.get_palette(color_count=6, quality=5)
+        colors = []
+        for rgb in palette:
+            h = _rgb_to_hex(*rgb)
+            h = _norm_hex(h)
+            if h and not _is_boring(h) and h not in THIRD_PARTY_COLORS:
+                colors.append(h)
+        log.info("p02_logo_colors", logo=logo_url[-50:], colors=colors)
+        return colors[:5]
+    except Exception as e:
+        log.warning("p02_logo_color_failed", error=str(e))
+        return []
+
+
 def _parse_fonts(css_text: str) -> list[str]:
     fonts = []
     for m in FONT_RE.finditer(css_text):
@@ -259,7 +354,8 @@ class BrandIdentityPipeline(BasePipeline):
 
     def fetch(self) -> dict:
         url = normalise_url(self.company_url)
-        raw = {"pages": [], "css_texts": [], "html_raw": "", "final_url": url}
+        raw = {"pages": [], "css_texts": [], "html_raw": "", "final_url": url,
+               "logo_url": None, "logo_colors": []}
 
         log.info("p02_fetch_website", url=url)
         raw["pages"] = fast_crawl(url, max_pages=3)
@@ -269,11 +365,21 @@ class BrandIdentityPipeline(BasePipeline):
             html = resp.text
             raw["html_raw"]  = html[:15000]
             raw["final_url"] = resp.url
+
+            # Linked CSS files
             for css_url in _extract_css_assets(html, resp.url):
                 css_text = _fetch_css(css_url)
                 if css_text:
                     raw["css_texts"].append(css_text)
                     log.info("p02_css_fetched", url=css_url, chars=len(css_text))
+
+            # Logo image colors
+            logo_url = _find_logo_url(html, resp.url)
+            if logo_url:
+                raw["logo_url"]    = logo_url
+                raw["logo_colors"] = _extract_logo_colors(logo_url)
+                log.info("p02_logo_found", logo=logo_url[-60:], colors=raw["logo_colors"])
+
         except Exception as e:
             log.warning("p02_html_fetch_failed", error=str(e))
 
@@ -283,9 +389,12 @@ class BrandIdentityPipeline(BasePipeline):
         all_css = "\n".join(raw.get("css_texts", []))
         html    = raw.get("html_raw", "")
 
-        # ── 4-layer color extraction (highest to lowest confidence) ──
-        css_var_colors  = _extract_css_vars(all_css)
-        meta_color      = _extract_meta_theme_color(html)
+        # ── 5-layer color extraction (highest to lowest confidence) ──
+        logo_colors     = raw.get("logo_colors", [])          # from brand logo image/svg
+        meta_color      = _extract_meta_theme_color(html)     # <meta theme-color>
+        inline_colors   = _extract_inline_style_colors(html)  # <style> blocks in HTML
+        css_var_colors  = _extract_css_vars(all_css + "\n" + "\n".join(
+            STYLE_BLOCK_RE.findall(html)))                     # CSS vars from both sources
         semantic_colors = _extract_semantic_colors(html, all_css)
         general_colors  = _extract_general_colors(all_css, html)
 
@@ -293,20 +402,25 @@ class BrandIdentityPipeline(BasePipeline):
         seen = set()
         merged = []
         for color in (
-            ([meta_color] if meta_color else []) +
-            css_var_colors +
-            semantic_colors +
-            general_colors
+            logo_colors +                          # logo = strongest brand signal
+            ([meta_color] if meta_color else []) + # meta theme-color = browser chrome
+            css_var_colors +                       # CSS vars = intentional design tokens
+            inline_colors +                        # inline <style> blocks
+            semantic_colors +                      # buttons, hero, headings
+            general_colors                         # frequency fallback
         ):
             if color and color not in seen:
                 seen.add(color)
                 merged.append(color)
 
-        fonts = _parse_fonts(all_css) or _parse_fonts(html)
+        fonts = _parse_fonts(all_css) or _parse_fonts(
+            "\n".join(STYLE_BLOCK_RE.findall(html))) or _parse_fonts(html)
         copy  = _extract_homepage_copy(raw.get("pages", []))
 
         log.info("p02_colors_extracted",
+                 logo=len(logo_colors),
                  meta=1 if meta_color else 0,
+                 inline=len(inline_colors),
                  css_vars=len(css_var_colors),
                  semantic=len(semantic_colors),
                  general=len(general_colors),
@@ -315,15 +429,18 @@ class BrandIdentityPipeline(BasePipeline):
         return {
             "company_name":       self.company_name,
             # Structured for LLM — grouped by confidence tier
+            "colors_logo":        logo_colors,
             "colors_meta":        [meta_color] if meta_color else [],
             "colors_css_vars":    css_var_colors,
+            "colors_inline":      inline_colors[:8],
             "colors_semantic":    semantic_colors,
             "colors_general":     general_colors[:8],
             # Merged best-guess list for fallback
             "extracted_colors":   merged[:12],
             "extracted_fonts":    fonts,
             "homepage_copy":      truncate(copy, 1500),
-            "css_sample":         all_css[:3000] if all_css else "",
+            "css_sample":         (all_css or "\n".join(STYLE_BLOCK_RE.findall(html)))[:3000],
+            "logo_url":           raw.get("logo_url"),
         }
 
     def synthesise(self, structured: dict) -> dict:
@@ -337,11 +454,18 @@ CATEGORY: {self.category}
 
 COLOR EXTRACTION RESULTS (use these to identify the real brand palette):
 
-  meta theme-color (browser chrome — highest confidence, 100% intentional):
+  LOGO colors — extracted from the actual brand logo image (HIGHEST confidence):
+    {structured.get('colors_logo') or 'Not found'}
+    Logo URL: {structured.get('logo_url') or 'Not found'}
+
+  meta theme-color (browser chrome — 100% intentional):
     {structured['colors_meta'] or 'Not found'}
 
   CSS custom property colors (--primary, --brand-*, --accent-* etc — very high confidence):
     {structured['colors_css_vars'] or 'None found'}
+
+  Inline <style> block colors (brand CSS embedded in HTML — high confidence):
+    {structured.get('colors_inline', [])[:6] or 'None found'}
 
   Semantic element colors (buttons, CTAs, headings, hero sections — high confidence):
     {structured['colors_semantic'] or 'None found'}
@@ -357,9 +481,10 @@ HOMEPAGE COPY (for tone, voice and positioning analysis):
 CSS SAMPLE (first 1500 chars — look for CSS variable definitions):
 {structured['css_sample'][:1500]}
 
-IMPORTANT: The meta theme-color and CSS custom properties are the most reliable signals.
-The semantic colors are colors used on CTAs and hero elements — these are intentional brand choices.
-IGNORE any colors that look like payment gateways, social media icons, or chat widgets.
+IMPORTANT: Logo colors and meta theme-color are the strongest signals — the brand CHOSE these.
+CSS custom properties are design tokens set intentionally by their team.
+Inline <style> block colors are real — modern sites (Shopify, Next.js) embed CSS here, not in files.
+IGNORE any colors that look like payment gateways (Razorpay, Paytm), social media icons, or chat widgets.
 Pick 2-4 colors that form a coherent, intentional brand palette."""
 
         result_str = synthesise(system_prompt, user_data, max_tokens=1000)
@@ -369,8 +494,10 @@ Pick 2-4 colors that form a coherent, intentional brand palette."""
             if output:
                 # Ensure primary_colors is always populated
                 if not output.get("primary_colors"):
-                    best = (structured["colors_meta"] or
+                    best = (structured.get("colors_logo") or
+                            structured["colors_meta"] or
                             structured["colors_css_vars"] or
+                            structured.get("colors_inline") or
                             structured["colors_semantic"] or
                             structured["extracted_colors"])
                     output["primary_colors"]  = best[:3]
@@ -378,8 +505,10 @@ Pick 2-4 colors that form a coherent, intentional brand palette."""
                 return output
 
         # Hard fallback
-        best = (structured["colors_meta"] or
+        best = (structured.get("colors_logo") or
+                structured["colors_meta"] or
                 structured["colors_css_vars"] or
+                structured.get("colors_inline") or
                 structured["colors_semantic"] or
                 structured["extracted_colors"])
         return {
