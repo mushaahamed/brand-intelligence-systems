@@ -54,7 +54,7 @@ RATE_LIMIT_DELAY = float(os.getenv("RATE_LIMIT_DELAY", "1"))
 API_HOST       = os.getenv("API_HOST", "0.0.0.0")
 API_PORT       = int(os.getenv("API_PORT", "8000"))
 TRACKING_BASE  = os.getenv("TRACKING_BASE", f"http://localhost:{os.getenv('API_PORT', '8000')}/track")
-ACTOR_TIMEOUT  = int(os.getenv("ACTOR_TIMEOUT", "60"))
+ACTOR_TIMEOUT  = int(os.getenv("ACTOR_TIMEOUT", "45"))
 
 
 def validate_config() -> dict:

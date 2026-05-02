@@ -10,7 +10,7 @@ import re, json, structlog, requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 from pipelines.base import BasePipeline
-from utils.apify_client import run_google_searches_parallel, scrape_linkedin_profiles
+from utils.apify_client import run_google_searches_parallel, scrape_linkedin_profiles_parallel
 from utils.claude_client import synthesise
 from utils.helpers import safe_json_parse, truncate, normalise_url
 
@@ -214,19 +214,20 @@ class DecisionMakersPipeline(BasePipeline):
         ]
         raw["google_people"] = run_google_searches_parallel(queries, PIPELINE_ID, num_results=8)
 
-        # ── Layer 2: Apify LinkedIn search — direct profile data ─────
-        li_queries = [
-            f"{n} Head of Marketing",
-            f"{n} CMO Chief Marketing Officer",
-            f"{n} Brand Manager Marketing",
-        ]
-        for q in li_queries:
+        # ── Layer 2: Apify LinkedIn search — parallel, only if Google thin ──
+        # Skip if Google already found 4+ people (saves ~25s of actor time)
+        google_hit_count = len(_parse_google_results(raw["google_people"], n))
+        if google_hit_count < 4:
+            li_queries = [
+                f"{n} Head of Marketing",
+                f"{n} CMO Brand Manager",
+            ]
             try:
-                results = scrape_linkedin_profiles(q, PIPELINE_ID, max_results=3)
-                if results:
-                    raw["linkedin_people"].extend(results)
+                raw["linkedin_people"] = scrape_linkedin_profiles_parallel(
+                    li_queries, PIPELINE_ID, max_results=3
+                )
             except Exception as e:
-                log.warning("p09_linkedin_scrape_error", query=q, error=str(e))
+                log.warning("p09_linkedin_scrape_error", error=str(e))
 
         # ── Layer 3: Company team page scrape ────────────────────────
         if self.company_url:

@@ -11,6 +11,7 @@ Accuracy principle: Every field confidence-scored. VERIFIED / INFERRED / NOT_FOU
 Never presents fabricated data as real.
 """
 import re, json, structlog
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pipelines.base import BasePipeline
 from utils.apify_client import scrape_linkedin_profiles
 from utils.helpers import safe_json_parse, extract_domain, normalise_url
@@ -75,77 +76,77 @@ class ContactIntelligencePipeline(BasePipeline):
         super().__init__(company_name, company_url, category)
         self.decision_makers = decision_makers_output or {}
 
+    def _lookup_one(self, person: dict, domain: str) -> dict:
+        """Look up a single person on LinkedIn. Designed to run in a thread."""
+        name  = person.get("name", "")
+        parts = name.strip().split()
+        first = parts[0] if parts else ""
+        last  = parts[-1] if len(parts) > 1 else ""
+        li_url = person.get("linkedin_url") or ""
+
+        query = f"{name} {self.company_name}"
+        li_results = []
+        try:
+            li_results = scrape_linkedin_profiles(
+                query, PIPELINE_ID, max_results=2, timeout_secs=20
+            ) or []
+        except Exception as e:
+            log.warning("p10_linkedin_error", name=name, error=str(e))
+
+        best = None
+        for item in li_results:
+            item_name = (item.get("fullName") or item.get("name") or
+                         f"{item.get('firstName','')} {item.get('lastName','')}".strip()).lower()
+            if any(p.lower() in item_name for p in name.split() if len(p) > 2):
+                best = item; break
+        if not best and li_results:
+            best = li_results[0]
+
+        email_val    = None
+        email_source = "not_found"
+        if best:
+            email_val = _extract_email_from_item(best)
+            if email_val:
+                email_source = "linkedin_verified"
+            if not li_url:
+                li_url = (best.get("profileUrl") or best.get("linkedinUrl") or
+                          best.get("url") or "")
+
+        if not email_val and first and last and domain:
+            inferred     = _infer_email(first, last, domain)
+            email_val    = inferred["email"]
+            email_source = "pattern_inferred"
+
+        return {
+            **person,
+            "first_name":       first,
+            "last_name":        last,
+            "domain":           domain,
+            "email":            email_val,
+            "email_source":     email_source,
+            "email_confidence": 70 if email_source == "linkedin_verified" else 20,
+            "linkedin_url":     li_url,
+            "linkedin_data":    best or {},
+        }
+
     def fetch(self) -> dict:
         domain    = extract_domain(normalise_url(self.company_url))
         committee = self.decision_makers.get("buying_committee", [])
-        raw = {"domain": domain, "contacts_raw": []}
+        raw       = {"domain": domain, "contacts_raw": []}
 
-        for person in committee[:5]:
-            name = person.get("name", "")
-            if not name:
-                continue
+        # Max 3 people, all lookups in parallel — cuts P10 time from ~2min to ~25s
+        targets = [p for p in committee[:3] if p.get("name")]
+        log.info("p10_parallel_lookup_start", people=len(targets))
 
-            parts = name.strip().split()
-            first = parts[0] if parts else ""
-            last  = parts[-1] if len(parts) > 1 else ""
+        with ThreadPoolExecutor(max_workers=3) as ex:
+            futures = {ex.submit(self._lookup_one, p, domain): p for p in targets}
+            for f in as_completed(futures, timeout=30):
+                try:
+                    raw["contacts_raw"].append(f.result())
+                except Exception as e:
+                    log.warning("p10_lookup_failed", error=str(e))
 
-            # Search LinkedIn for this specific person at this company
-            query = f"{name} {self.company_name}"
-            log.info("p10_linkedin_lookup", name=name, query=query)
-
-            li_results = []
-            try:
-                li_results = scrape_linkedin_profiles(query, PIPELINE_ID, max_results=2) or []
-            except Exception as e:
-                log.warning("p10_linkedin_error", name=name, error=str(e))
-
-            # Find the best matching result
-            best = None
-            name_lower = name.lower()
-            for item in li_results:
-                item_name = (item.get("fullName") or item.get("name") or
-                             f"{item.get('firstName','')} {item.get('lastName','')}".strip()).lower()
-                # Accept if name is a substring match
-                if any(part.lower() in item_name for part in name.split() if len(part) > 2):
-                    best = item
-                    break
-
-            if not best and li_results:
-                best = li_results[0]  # take first result if no name match
-
-            # Extract contact data
-            email_val = None
-            email_source = "not_found"
-            li_url = person.get("linkedin_url") or ""
-
-            if best:
-                email_val = _extract_email_from_item(best)
-                if email_val:
-                    email_source = "linkedin_verified"
-
-                # LinkedIn URL from actor if not already in P09 data
-                if not li_url:
-                    li_url = (best.get("profileUrl") or best.get("linkedinUrl") or
-                              best.get("url") or "")
-
-            # Fallback: pattern-infer if no email found
-            if not email_val and first and last and domain:
-                inferred = _infer_email(first, last, domain)
-                email_val    = inferred["email"]
-                email_source = "pattern_inferred"
-
-            raw["contacts_raw"].append({
-                **person,
-                "first_name":    first,
-                "last_name":     last,
-                "domain":        domain,
-                "email":         email_val,
-                "email_source":  email_source,
-                "email_confidence": 70 if email_source == "linkedin_verified" else 20,
-                "linkedin_url":  li_url,
-                "linkedin_data": best or {},
-            })
-
+        log.info("p10_lookup_done", contacts=len(raw["contacts_raw"]))
         return raw
 
     def extract(self, raw: dict) -> dict:
