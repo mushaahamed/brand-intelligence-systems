@@ -3,120 +3,193 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>BrandScope — StepOneXP Intelligence</title>
+  <title>BrandScope — Brand Intelligence</title>
   <link rel="stylesheet" href="style.css"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 </head>
 <body>
 
 <!-- ── NAV ── -->
-<nav class="nav">
+<nav class="nav" id="mainNav">
   <div class="nav-inner">
     <div class="nav-logo">
-      <span class="logo-icon">◈</span>
-      <span class="logo-text">BrandScope</span>
-      <span class="logo-tag">by StepOneXP</span>
+      <div class="nav-logo-mark">B</div>
+      <span class="nav-logo-text">BrandScope</span>
+      <span class="nav-divider"></span>
+      <span class="nav-logo-sub">by StepOneXP</span>
     </div>
-    <div class="nav-links">
-      <button class="nav-btn active" onclick="showSection('form')" id="nav-analyse">Analyse</button>
+    <div class="nav-actions">
+      <button class="nav-btn active" onclick="showSection('form')" id="nav-analyse">New Analysis</button>
       <button class="nav-btn" onclick="showSection('reports')" id="nav-reports">Reports</button>
     </div>
   </div>
 </nav>
 
-<!-- ── FORM SECTION ── -->
+<!-- ══════════════════════════════════════════
+     FORM SECTION
+══════════════════════════════════════════ -->
 <section id="sec-form" class="section">
-  <div class="form-hero">
-    <div class="form-hero-text">
-      <div class="hero-tag">12-Pipeline Brand Intelligence</div>
-      <h1>Know every brand<br/><span class="g">before the pitch.</span></h1>
-      <p class="hero-sub">Drop a URL. Get full brand intel — competitors, decision makers, events footprint, and a personalised outreach sequence — in under 2 minutes.</p>
-    </div>
-    <div class="form-card">
-      <div class="form-card-header">
-        <span class="fc-dot"></span>
-        <span class="fc-dot fc-dot--y"></span>
-        <span class="fc-dot fc-dot--g"></span>
-        <span class="fc-title">New Analysis</span>
+  <div class="hero-wrap">
+    <div class="hero-bg-grid"></div>
+
+    <div class="hero-content">
+      <div class="hero-left">
+        <div class="hero-badge">
+          <span class="hero-badge-dot"></span>
+          12-pipeline intelligence system
+        </div>
+        <h1 class="hero-title">Understand every brand<br/><span class="hero-accent">before the first call.</span></h1>
+        <p class="hero-body">Drop a URL. BrandScope runs 12 parallel research pipelines — brand identity, competitor mapping, experiential footprint, decision makers, verified contacts — and writes a personalised outreach sequence for every stakeholder. Done in under 2 minutes.</p>
+
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <div class="hero-stat-num">12</div>
+            <div class="hero-stat-label">Intelligence pipelines</div>
+          </div>
+          <div class="hero-stat-divider"></div>
+          <div class="hero-stat">
+            <div class="hero-stat-num">&lt;2m</div>
+            <div class="hero-stat-label">Full analysis</div>
+          </div>
+          <div class="hero-stat-divider"></div>
+          <div class="hero-stat">
+            <div class="hero-stat-num">4×</div>
+            <div class="hero-stat-label">Outreach touches per contact</div>
+          </div>
+        </div>
       </div>
-      <form id="inputForm">
-        <div class="field">
-          <label>Company Name</label>
-          <input type="text" id="company_name" placeholder="e.g. Mamaearth" required autocomplete="off"/>
+
+      <div class="hero-right">
+        <div class="form-card">
+          <div class="form-card-top">
+            <div class="form-card-title">New Analysis</div>
+            <div class="form-card-sub">Takes 90–120 seconds</div>
+          </div>
+          <form id="inputForm">
+            <div class="field">
+              <label for="company_name">Company Name</label>
+              <input type="text" id="company_name" placeholder="e.g. Mamaearth" required autocomplete="off"/>
+            </div>
+            <div class="field">
+              <label for="company_url">Website</label>
+              <input type="url" id="company_url" placeholder="https://mamaearth.in" required/>
+            </div>
+            <div class="field">
+              <label for="category">One-line category</label>
+              <input type="text" id="category" placeholder="D2C skincare brand targeting millennial women in India" required/>
+            </div>
+            <button type="submit" class="btn-primary" id="submitBtn">
+              <span id="submitLabel">Run Analysis</span>
+              <svg class="btn-arrow" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </form>
         </div>
-        <div class="field">
-          <label>Company Website</label>
-          <input type="url" id="company_url" placeholder="https://mamaearth.in" required/>
+
+        <div class="hero-pipeline-preview">
+          <div class="hpp-label">Pipelines run on every analysis</div>
+          <div class="hpp-list">
+            <span>Company Overview</span><span>Brand Identity</span><span>Market Position</span>
+            <span>Competitor Mapping</span><span>Brand Activity</span><span>Events Footprint</span>
+            <span>Reputation Research</span><span>Strategic Watchouts</span><span>Decision Makers</span>
+            <span>Contact Intelligence</span><span>Outreach Sequences</span><span>Tracking Setup</span>
+          </div>
         </div>
-        <div class="field">
-          <label>One-Line Category</label>
-          <input type="text" id="category" placeholder="D2C skincare brand targeting millennial women in India" required/>
-        </div>
-        <button type="submit" class="btn-run" id="submitBtn">
-          <span class="btn-run-icon">▶</span> Run Full Analysis
-        </button>
-      </form>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- ── ANALYSIS SECTION ── -->
+<!-- ══════════════════════════════════════════
+     ANALYSIS SECTION — AI THINKING
+══════════════════════════════════════════ -->
 <section id="sec-analysis" class="section hidden">
-  <div class="analysis-wrap">
-
-    <!-- LEFT: Terminal log -->
-    <div class="terminal-panel">
-      <div class="terminal-topbar">
-        <span class="tb-dot"></span><span class="tb-dot tb-dot--y"></span><span class="tb-dot tb-dot--g"></span>
-        <span class="tb-title">brandscope@steponexp ~ analysis</span>
-        <span class="tb-time" id="elapsedTimer">00:00</span>
+  <div class="analysis-header">
+    <div class="analysis-header-left">
+      <div class="analysis-spinner"></div>
+      <div>
+        <div class="analysis-title" id="analysisTitle">Analysing…</div>
+        <div class="analysis-subtitle" id="analysisSubtitle">Initialising intelligence engine</div>
       </div>
-      <div class="terminal-body" id="termLog">
-        <div class="term-line term-info"><span class="term-ts">00:00</span><span class="term-msg">Initialising analysis engine...</span></div>
+    </div>
+    <div class="analysis-header-right">
+      <div class="analysis-phase" id="analysisPhase">Phase 1 — Parallel Research</div>
+      <div class="analysis-timer" id="elapsedTimer">0:00</div>
+    </div>
+  </div>
+
+  <div class="analysis-progress-wrap">
+    <div class="analysis-progress-bar" id="ppBar"></div>
+  </div>
+  <div class="analysis-progress-meta">
+    <span id="ppStats">0 / 12 pipelines complete</span>
+    <span id="ppPct">0%</span>
+  </div>
+
+  <div class="analysis-body">
+
+    <!-- Pipeline grid -->
+    <div class="pipeline-section">
+      <div class="section-label">Intelligence Pipelines</div>
+      <div class="pipeline-grid" id="pipelineGrid"></div>
+      <div class="dataflow-row">
+        <div class="dataflow-group">
+          <div class="dataflow-label">Phase 1 — Parallel</div>
+          <div class="dataflow-pills">
+            <span>P01</span><span>P02</span><span>P03</span><span>P04</span><span>P05</span>
+            <span>P06</span><span>P07</span><span>P08</span><span>P09</span>
+          </div>
+        </div>
+        <div class="dataflow-arrow">→</div>
+        <div class="dataflow-group">
+          <div class="dataflow-label">Phase 2 — Sequential</div>
+          <div class="dataflow-pills">
+            <span>P10</span><span>P11</span><span>P12</span>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- RIGHT: Pipeline grid -->
-    <div class="pipeline-panel">
-      <div class="pp-header">
-        <span class="pp-title">PIPELINES</span>
-        <div class="pp-progress-wrap">
-          <div class="pp-progress-bar" id="ppBar"></div>
-        </div>
-        <span class="pp-pct" id="ppPct">0%</span>
+    <!-- Intelligence stream -->
+    <div class="stream-section">
+      <div class="section-label">Intelligence Stream
+        <span class="stream-live-dot"></span>
       </div>
-      <div class="pipeline-grid" id="pipelineGrid"></div>
-      <div class="pp-stats" id="ppStats">
-        <span>Running 12 pipelines in parallel</span>
-      </div>
+      <div class="stream-body" id="termLog"></div>
     </div>
 
   </div>
 </section>
 
-<!-- ── RESULTS SECTION ── -->
+<!-- ══════════════════════════════════════════
+     RESULTS SECTION
+══════════════════════════════════════════ -->
 <section id="sec-results" class="section hidden">
 
-  <!-- Sticky header -->
+  <!-- Results header -->
   <div class="results-header" id="resultsHeader">
-    <div class="rh-left">
-      <div class="rh-company" id="rhCompany">—</div>
-      <div class="rh-meta" id="rhMeta">—</div>
-    </div>
-    <div class="rh-score-wrap">
-      <div class="rh-score-label">ICP FIT</div>
-      <div class="rh-score" id="rhScore">—</div>
-      <div class="rh-score-bar-wrap"><div class="rh-score-bar" id="rhScoreBar"></div></div>
-    </div>
-    <div class="rh-actions">
-      <button class="btn-ghost" onclick="openExportPDF()">⬇ Export PDF</button>
-      <button class="btn-ghost" onclick="showSection('form')">+ New</button>
+    <div class="results-header-inner">
+      <div class="rh-left">
+        <div class="rh-company" id="rhCompany">—</div>
+        <div class="rh-meta" id="rhMeta">—</div>
+      </div>
+      <div class="rh-scores">
+        <div class="rh-score-item">
+          <div class="rh-score-label">ICP FIT</div>
+          <div class="rh-score-value" id="rhScore">—</div>
+          <div class="rh-score-bar-wrap"><div class="rh-score-bar" id="rhScoreBar"></div></div>
+        </div>
+        <div class="rh-verdict" id="rhVerdict"></div>
+      </div>
+      <div class="rh-actions">
+        <button class="btn-ghost" onclick="exportPDF()">
+          <svg viewBox="0 0 16 16" fill="none" width="14" height="14"><path d="M4 12h8M8 3v7M5 7l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Export PDF
+        </button>
+        <button class="btn-ghost" onclick="showSection('form')">+ New</button>
+      </div>
     </div>
   </div>
-
-  <!-- Verdict banner -->
-  <div class="verdict-banner" id="verdictBanner"></div>
 
   <!-- Tabs -->
   <div class="tabs-wrap">
@@ -132,14 +205,14 @@
   </div>
 
   <!-- Tab panels -->
-  <div class="panels">
+  <div class="panels-wrap">
 
     <div class="panel active" id="panel-overview">
-      <div class="cards-grid">
+      <div class="overview-grid">
+        <div class="card" id="card-icp-score"></div>
         <div class="card" id="card-company"></div>
-        <div class="card" id="card-market"></div>
-        <div class="card" id="card-reputation"></div>
         <div class="card" id="card-watchouts"></div>
+        <div class="card" id="card-reputation"></div>
         <div class="card card-wide" id="card-timing"></div>
       </div>
     </div>
@@ -172,9 +245,7 @@
     </div>
 
     <div class="panel" id="panel-outreach">
-      <div class="cards-grid">
-        <div class="card card-full" id="card-outreach"></div>
-      </div>
+      <div id="outreach-section"></div>
     </div>
 
     <div class="panel" id="panel-tracking">
@@ -186,14 +257,21 @@
   </div>
 </section>
 
-<!-- ── REPORTS SECTION ── -->
+<!-- ══════════════════════════════════════════
+     REPORTS SECTION
+══════════════════════════════════════════ -->
 <section id="sec-reports" class="section hidden">
   <div class="reports-wrap">
     <div class="reports-hdr">
-      <h2>Past Reports</h2>
-      <button class="btn-ghost" onclick="showSection('form')">+ New Analysis</button>
+      <div>
+        <h2 class="reports-title">Past Reports</h2>
+        <p class="reports-sub">Click any report to reload the full analysis.</p>
+      </div>
+      <button class="btn-primary" onclick="showSection('form')">New Analysis</button>
     </div>
-    <div class="reports-grid" id="reportsGrid">Loading...</div>
+    <div class="reports-grid" id="reportsGrid">
+      <div class="reports-loading">Loading…</div>
+    </div>
   </div>
 </section>
 

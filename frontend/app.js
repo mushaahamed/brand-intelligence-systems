@@ -1,7 +1,8 @@
 'use strict';
-/* ═══════════════════════════════════════════════════
-   BrandScope v2 — Neon Green Terminal Frontend
-   ═══════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════
+   BrandScope v2 — Intelligence Frontend
+   Harmonic-inspired · Dark Navy · Multi-person Outreach
+   ═══════════════════════════════════════════════════════ */
 
 const API  = window.location.hostname === 'localhost' ? 'http://localhost:8000' : '';
 const POLL = 1000;
@@ -12,41 +13,72 @@ let currentReport = null;
 let currentRunId  = null;
 let timerInterval = null;
 let jobStart      = null;
-let logCount      = 0;   // track how many log entries we've rendered
+let logCount      = 0;
+let activeContact = 0;
+let currentSeqs   = [];  // current contact sequences for outreach tab
 
 const PIPELINES = [
-  { id:'p01', name:'Company Overview'     },
-  { id:'p02', name:'Brand Identity'       },
-  { id:'p03', name:'Market Position'      },
-  { id:'p04', name:'Competitor Mapping'   },
-  { id:'p05', name:'Brand Activity'       },
-  { id:'p06', name:'Events Footprint'     },
-  { id:'p07', name:'Reputation Research'  },
-  { id:'p08', name:'Strategic Watchouts'  },
-  { id:'p09', name:'Decision Makers'      },
-  { id:'p10', name:'Contact Intelligence' },
-  { id:'p11', name:'Outreach Sequences'   },
-  { id:'p12', name:'Tracking Setup'       },
+  { id:'p01', label:'P01', name:'Company Overview'     },
+  { id:'p02', label:'P02', name:'Brand Identity'       },
+  { id:'p03', label:'P03', name:'Market Position'      },
+  { id:'p04', label:'P04', name:'Competitor Mapping'   },
+  { id:'p05', label:'P05', name:'Brand Activity'       },
+  { id:'p06', label:'P06', name:'Events Footprint'     },
+  { id:'p07', label:'P07', name:'Reputation Research'  },
+  { id:'p08', label:'P08', name:'Strategic Watchouts'  },
+  { id:'p09', label:'P09', name:'Decision Makers'      },
+  { id:'p10', label:'P10', name:'Contact Intelligence' },
+  { id:'p11', label:'P11', name:'Outreach Sequences'   },
+  { id:'p12', label:'P12', name:'Tracking Setup'       },
 ];
 
 /* ── DOM helpers ── */
 const $  = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-function toast(msg, ms=3000){
-  const el=$('toast'); el.textContent=msg; el.classList.remove('hidden');
-  clearTimeout(el._t); el._t=setTimeout(()=>el.classList.add('hidden'),ms);
+
+function toast(msg, ms = 3000) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.add('hidden'), ms);
 }
 
-/* ── Navigation ── */
+function initials(name) {
+  if (!name) return '?';
+  return name.split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('');
+}
+
+/* ── KV helper (new CSS class names) ── */
+function kv(key, val, cls = '') {
+  if (val == null || val === '' || val === undefined) return '';
+  return `<div class="kv"><span class="kk">${esc(key)}</span><span class="kv-val ${cls}">${esc(val)}</span></div>`;
+}
+
+function badge(txt, cls = '') {
+  if (!txt) return '';
+  return `<span class="badge ${cls}">${esc(txt)}</span>`;
+}
+
+function verdictCls(v) {
+  if (!v) return '';
+  const up = String(v).toUpperCase();
+  if (['HIGH','POSITIVE','STRONG','GOOD','GREEN'].includes(up)) return 'g';
+  if (['LOW','NEGATIVE','POOR','RED'].includes(up)) return 'r';
+  if (['MEDIUM','MIXED','NEUTRAL','AMBER','MODERATE'].includes(up)) return 'a';
+  return '';
+}
+
+/* ════════════════════════════════════════════════════════
+   NAVIGATION
+════════════════════════════════════════════════════════ */
 function showSection(name) {
   ['form','analysis','results','reports'].forEach(s => {
     const el = $(`sec-${s}`);
     if (el) el.classList.toggle('hidden', s !== name);
   });
-  ['analyse','reports'].forEach(b => {
-    const el = $(`nav-${b}`);
-    if (el) el.classList.toggle('active', b === (name === 'form' ? 'analyse' : name));
-  });
+  $('nav-analyse')?.classList.toggle('active', name === 'form');
+  $('nav-reports')?.classList.toggle('active', name === 'reports');
   if (name === 'reports') loadReports();
 }
 window.showSection = showSection;
@@ -66,40 +98,50 @@ $('inputForm').addEventListener('submit', async e => {
   e.preventDefault();
   const btn = $('submitBtn');
   btn.disabled = true;
-  btn.innerHTML = '⏳ Starting…';
+  btn.innerHTML = '<span>Starting…</span>';
+
   const payload = {
     company_name: $('company_name').value.trim(),
     company_url:  $('company_url').value.trim(),
     category:     $('category').value.trim(),
   };
+
   try {
-    const res  = await fetch(`${API}/analyse`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+    const res = await fetch(`${API}/analyse`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     startAnalysis(data.job_id, payload.company_name);
-  } catch(err) {
+  } catch (err) {
     toast(`⚠ ${err.message}`, 5000);
     btn.disabled = false;
-    btn.innerHTML = '<span class="btn-run-icon">▶</span> Run Full Analysis';
+    btn.innerHTML = '<span>Run Analysis</span><svg class="btn-arrow" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
 });
 
-/* ══════════════════════════════════════════════════
-   ANALYSIS VIEW
-══════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════
+   ANALYSIS — AI THINKING VIEW
+════════════════════════════════════════════════════════ */
 function startAnalysis(jid, companyName) {
   jobId    = jid;
   jobStart = Date.now();
   logCount = 0;
+  activeContact = 0;
 
   showSection('analysis');
   buildPipelineGrid();
   startElapsedTimer();
 
-  // Clear terminal
-  $('termLog').innerHTML = '';
-  addTermLine('system','info', `▸ Initialising analysis for "${esc(companyName)}"…`);
-  addTermLine('system','info', `▸ Job ID: ${jid}`);
+  const log = $('termLog');
+  if (log) log.innerHTML = '';
+  addStreamEntry('system', 'info', `Initialising analysis for "${companyName}"`);
+  addStreamEntry('system', 'info', `Job ID: ${jid} · 12 intelligence pipelines queued`);
+
+  $('analysisTitle').textContent  = `Analysing ${companyName}`;
+  $('analysisSubtitle').textContent = 'Connecting to intelligence pipelines…';
 
   pollTimer = setInterval(doPoll, POLL);
 }
@@ -107,21 +149,25 @@ function startAnalysis(jid, companyName) {
 function startElapsedTimer() {
   clearInterval(timerInterval);
   timerInterval = setInterval(() => {
-    const s = Math.floor((Date.now() - jobStart) / 1000);
-    const m = Math.floor(s / 60); const ss = String(s % 60).padStart(2,'0');
-    const el = $('tbTime') || $('elapsedTimer');
+    const s  = Math.floor((Date.now() - jobStart) / 1000);
+    const m  = Math.floor(s / 60);
+    const ss = String(s % 60).padStart(2, '0');
+    const el = $('elapsedTimer');
     if (el) el.textContent = `${m}:${ss}`;
   }, 500);
 }
 
 function buildPipelineGrid() {
-  $('pipelineGrid').innerHTML = PIPELINES.map(p => `
-    <div class="pipe-item" id="pipe-${p.id}">
-      <div class="pipe-icon">○</div>
-      <div>
-        <div class="pipe-name">${p.name}</div>
-        <div class="pipe-finding" id="pipe-${p.id}-finding">waiting...</div>
+  const grid = $('pipelineGrid');
+  if (!grid) return;
+  grid.innerHTML = PIPELINES.map(p => `
+    <div class="pi" id="pi-${p.id}">
+      <span class="pi-num">${p.label}</span>
+      <div class="pi-body">
+        <div class="pi-name">${p.name}</div>
+        <div class="pi-status" id="pi-${p.id}-status">waiting</div>
       </div>
+      <span class="pi-icon" id="pi-${p.id}-icon">○</span>
     </div>`).join('');
 }
 
@@ -137,101 +183,113 @@ async function doPoll() {
       pollTimer = null;
 
       if (data.status === 'complete') {
-        addTermLine('system','complete', `✓ Analysis complete — ${data.elapsed?.toFixed(1) || '?'}s · 12/12 pipelines`);
+        addStreamEntry('system', 'complete', `Analysis complete · ${data.elapsed?.toFixed(1) || '?'}s · all 12 pipelines`);
         PIPELINES.forEach(p => setPipeState(p.id, 'done', ''));
-        $('ppBar').style.width = '100%';
-        $('ppPct').textContent = '100%';
-        setTimeout(() => {
-          if (data.run_id) loadReport(data.run_id);
-        }, 700);
+        $('ppBar').style.width  = '100%';
+        $('ppPct').textContent  = '100%';
+        $('ppStats').textContent = '12 / 12 pipelines complete';
+        $('analysisPhase').textContent     = 'Complete';
+        $('analysisSubtitle').textContent  = 'All pipelines finished — loading results…';
+        setTimeout(() => { if (data.run_id) loadReport(data.run_id); }, 700);
       } else {
-        addTermLine('system','error', `✗ Analysis failed — ${data.error || 'unknown error'}`);
-        toast('Analysis failed — check debug endpoint', 6000);
-        const btn = $('submitBtn');
-        if (btn) { btn.disabled=false; btn.innerHTML='<span class="btn-run-icon">▶</span> Run Full Analysis'; }
+        addStreamEntry('system', 'error', `Analysis failed — ${data.error || 'unknown error'}`);
+        toast('Analysis failed', 5000);
+        resetSubmitBtn();
       }
     }
-  } catch(err) { /* silent retry */ }
+  } catch { /* silent retry */ }
 }
 
 function updateAnalysisView(data) {
-  const done    = data.pipelines_done    || [];
-  const running = data.running_pipelines || [];
+  const done      = data.pipelines_done     || [];
+  const running   = data.running_pipelines  || [];
   const summaries = data.pipeline_summaries || {};
-  const logEntries = data.pipeline_log || [];
+  const logEntries = data.pipeline_log      || [];
   const pct = Math.min(95, Math.round((done.length / 12) * 100));
 
-  $('ppBar').style.width = `${pct}%`;
-  $('ppPct').textContent = `${pct}%`;
-  $('ppStats').textContent = `${done.length}/12 done · ${running.length} running`;
+  $('ppBar').style.width  = `${pct}%`;
+  $('ppPct').textContent  = `${pct}%`;
+  $('ppStats').textContent = `${done.length} / 12 pipelines complete`;
 
-  // Sync terminal from log entries (only new ones)
+  // Phase indicator
+  const phase = done.length < 9 ? 'Phase 1 — Parallel Research' : 'Phase 2 — Sequential Synthesis';
+  $('analysisPhase').textContent = phase;
+
+  // Render new log entries
   if (logEntries.length > logCount) {
     logEntries.slice(logCount).forEach(entry => {
-      const prefix = { start:'▸', done:'✓', error:'✗', info:'ℹ', complete:'★' }[entry.type] || '·';
-      const label  = entry.pipeline !== 'system'
-        ? `[${PIPELINES.find(p=>entry.pipeline?.startsWith(p.id)+'_' || entry.pipeline===p.id)?.name || entry.pipeline.slice(0,3).toUpperCase()}] `
-        : '';
-      addTermLine(entry.pipeline, entry.type, `${prefix} ${label}${entry.message}`);
+      const pipeName = PIPELINES.find(p =>
+        entry.pipeline?.startsWith(p.id + '_') || entry.pipeline === p.id
+      )?.label || (entry.pipeline === 'system' ? 'SYS' : entry.pipeline?.slice(0,3).toUpperCase() || '?');
+      addStreamEntry(pipeName, entry.type, entry.message);
     });
     logCount = logEntries.length;
   }
 
   // Update pipeline cards
   PIPELINES.forEach(p => {
-    const fullKey = done.find(d => d.startsWith(p.id+'_') || d === p.id);
-    const isRun   = running.some(r => r.startsWith(p.id+'_') || r === p.id);
+    const fullKey = done.find(d => d.startsWith(p.id + '_') || d === p.id);
+    const isRun   = running.some(r => r.startsWith(p.id + '_') || r === p.id);
     const sum     = summaries[fullKey] || {};
 
     if (fullKey && sum.status === 'error') {
-      setPipeState(p.id, 'error', sum.finding || 'Error');
+      setPipeState(p.id, 'error', sum.finding || 'Pipeline error');
     } else if (fullKey) {
-      const finding = sum.finding || '';
-      // Strip the elapsed part for display clarity
-      setPipeState(p.id, 'done', finding.replace(/\s*\[[\d.]+s\]$/, ''));
+      const finding = (sum.finding || '').replace(/\s*\[[\d.]+s\]$/, '');
+      setPipeState(p.id, 'done', finding || 'Complete');
     } else if (isRun) {
-      setPipeState(p.id, 'running', 'scanning...');
+      setPipeState(p.id, 'running', 'scanning…');
+      $(`pi-${p.id}-status`).textContent = 'scanning…';
     }
   });
 }
 
 function setPipeState(shortId, state, finding) {
-  const el   = $(`pipe-${shortId}`);
-  const find = $(`pipe-${shortId}-finding`);
+  const el     = $(`pi-${shortId}`);
+  const status = $(`pi-${shortId}-status`);
+  const icon   = $(`pi-${shortId}-icon`);
   if (!el) return;
-  el.className = `pipe-item pipe-item--${state}`;
-  const icons = { running:'⟳', done:'✓', error:'✗' };
-  el.querySelector('.pipe-icon').textContent = icons[state] || '○';
-  if (find && finding) find.textContent = finding;
+
+  el.className = `pi${state ? ' pi--' + state : ''}`;
+  const icons = { running: '⟳', done: '✓', error: '✗' };
+  if (icon)   icon.textContent = icons[state] || '○';
+  if (status && finding) status.textContent = finding;
 }
 
-function addTermLine(pipeline, type, msg) {
+function addStreamEntry(pipeline, type, msg) {
   const log = $('termLog');
   if (!log) return;
-  const s   = Math.floor((Date.now() - (jobStart||Date.now())) / 1000);
-  const ts  = `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+  const s   = Math.floor((Date.now() - (jobStart || Date.now())) / 1000);
+  const ts  = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   const div = document.createElement('div');
-  div.className = `term-line type-${type}`;
-  div.innerHTML = `<span class="term-ts">${ts}</span><span class="term-msg">${esc(msg)}</span>`;
+  div.className = `sl t-${type || 'info'}`;
+  div.innerHTML = `<span class="sl-ts">${ts}</span><span class="sl-badge">${esc(pipeline || 'SYS')}</span><span class="sl-msg">${esc(msg)}</span>`;
   log.appendChild(div);
+  if (log.children.length > 300) log.removeChild(log.firstChild);
   log.scrollTop = log.scrollHeight;
 }
 
-/* ══════════════════════════════════════════════════
+function resetSubmitBtn() {
+  const btn = $('submitBtn');
+  if (!btn) return;
+  btn.disabled = false;
+  btn.innerHTML = '<span>Run Analysis</span><svg class="btn-arrow" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+}
+
+/* ════════════════════════════════════════════════════════
    LOAD & RENDER REPORT
-══════════════════════════════════════════════════ */
+════════════════════════════════════════════════════════ */
 async function loadReport(runId) {
   try {
-    const res  = await fetch(`${API}/report/${runId}`);
+    const res = await fetch(`${API}/report/${runId}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     currentReport = data;
     currentRunId  = runId;
     renderReport(data);
     showSection('results');
-    const btn = $('submitBtn');
-    if (btn) { btn.disabled=false; btn.innerHTML='<span class="btn-run-icon">▶</span> Run Full Analysis'; }
-  } catch(err) {
+    resetSubmitBtn();
+  } catch (err) {
     toast(`Could not load report: ${err.message}`, 5000);
   }
 }
@@ -254,29 +312,30 @@ function renderReport(data) {
   const p11 = pout('p11_outreach');
   const p12 = pout('p12_tracking');
 
-  // Header
+  /* ── Results header ── */
   $('rhCompany').textContent = data.company_name || '—';
-  const elapsed = data.total_elapsed ? `${data.total_elapsed.toFixed(1)}s` : '';
-  $('rhMeta').textContent = `${data.run_id || ''} · ${data.category || ''} ${elapsed ? '· '+elapsed : ''}`;
+  const elapsed = data.total_elapsed ? ` · ${data.total_elapsed.toFixed(1)}s` : '';
+  $('rhMeta').textContent = `${data.run_id || ''} · ${data.category || ''}${elapsed}`;
 
   const icp = p01.icp_fit_score ?? 0;
+  const icpColor = icp >= 70 ? 'var(--green)' : icp >= 40 ? 'var(--amber)' : 'var(--red)';
   $('rhScore').textContent = icp || '—';
+  $('rhScore').style.color = icpColor;
   $('rhScoreBar').style.width = `${icp}%`;
-  $('rhScoreBar').style.background = icp >= 70 ? 'var(--green)' : icp >= 40 ? 'var(--amber)' : 'var(--red)';
+  $('rhScoreBar').style.background = icpColor;
 
-  // Verdict banner
   const v  = p08.overall_verdict || '';
-  const vb = $('verdictBanner');
-  if (v) {
-    vb.className = `verdict-banner show ${v}`;
-    vb.textContent = `${v === 'GREEN' ? '▲' : v === 'AMBER' ? '⚠' : '✗'} Strategic Watchout: ${v} — ${p08.timing_recommendation || ''} · ${p08.verdict_reasoning || ''}`;
+  const vEl = $('rhVerdict');
+  if (v && vEl) {
+    vEl.className = `rh-verdict ${v}`;
+    vEl.textContent = v;
   }
 
-  // Render all cards
+  /* ── All cards ── */
+  renderIcpCard(p01);
   renderCompanyCard(p01);
-  renderMarketCard(p03);
-  renderReputationCard(p07);
   renderWatchoutsCard(p08);
+  renderReputationCard(p07);
   renderTimingCard(p08);
   renderColorsCard(p02);
   renderVoiceCard(p02);
@@ -285,718 +344,851 @@ function renderReport(data) {
   renderActivityCard(p05);
   renderEventsCard(p06);
   renderPeopleCard(p09, p10);
-  renderOutreachCard(p11);
+  renderOutreachSection(p11, p09);
   renderTrackingCard(p12);
 }
 
-/* ── HELPERS ── */
-const frow = (k,v,cls='') => v!=null&&v!==''&&v!==undefined
-  ? `<div class="frow"><span class="fkey">${esc(k)}</span><span class="fval ${cls}">${esc(v)}</span></div>` : '';
+/* ════════════════════════════════════════════════════════
+   CARD RENDERERS
+════════════════════════════════════════════════════════ */
 
-const badge = (txt, cls='') => txt ? `<span class="badge ${cls}">${esc(txt)}</span>` : '';
+/* ICP Gauge */
+function renderIcpCard(d) {
+  const score = d.icp_fit_score ?? 0;
+  const color  = score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--amber)' : 'var(--red)';
+  const colorHex = score >= 70 ? '#10B981' : score >= 40 ? '#F59E0B' : '#EF4444';
+  const pct   = score;
+  const r     = 44;
+  const cx    = 60; const cy = 64;
+  const circ  = Math.PI * r;
+  const offset = circ * (1 - pct / 100);
 
-function verdictClass(v) {
-  if (!v) return '';
-  if (['HIGH','POSITIVE','STRONG','GOOD','GREEN'].includes(String(v).toUpperCase())) return 'g';
-  if (['LOW','NEGATIVE','POOR','RED'].includes(String(v).toUpperCase())) return 'r';
-  if (['MEDIUM','MIXED','NEUTRAL','AMBER','MODERATE'].includes(String(v).toUpperCase())) return 'a';
-  return '';
+  const readiness = d.experiential_readiness || '';
+  const readCls   = verdictCls(readiness) === 'g' ? 'green' : verdictCls(readiness) === 'r' ? 'red' : verdictCls(readiness) === 'a' ? 'amber' : '';
+
+  $('card-icp-score').innerHTML = `
+    <div class="card-head"><span class="card-title">ICP Fit</span></div>
+    <div class="icp-card-body">
+      <div class="icp-gauge-wrap">
+        <svg width="120" height="72" viewBox="0 0 120 72">
+          <path d="M16,64 A44,44,0,0,1,104,64" fill="none" stroke="var(--bg-3)" stroke-width="8" stroke-linecap="round"/>
+          <path d="M16,64 A44,44,0,0,1,104,64" fill="none" stroke="${colorHex}" stroke-width="8"
+            stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" stroke-linecap="round"/>
+        </svg>
+        <div class="icp-label-center">
+          <span class="icp-score-big" style="color:${color}">${score}</span>
+          <span class="icp-score-sub">/100</span>
+        </div>
+      </div>
+      <div class="icp-subtitle">ICP Score</div>
+      ${readiness ? `<div class="icp-readiness badge ${readCls}">${esc(readiness)}</div>` : ''}
+      ${d.recommended_service ? `<div style="font-size:11px;color:var(--text-3);text-align:center;margin-top:6px;line-height:1.4">${esc(d.recommended_service)}</div>` : ''}
+    </div>`;
 }
 
-/* ── CARD RENDERERS ── */
+/* Company Overview */
 function renderCompanyCard(d) {
   $('card-company').innerHTML = `
-    <div class="card-head"><span class="card-title">Company Overview</span>
-      ${d.icp_fit_score ? `<span class="badge bg">ICP ${d.icp_fit_score}/100</span>` : ''}
-    </div>
+    <div class="card-head"><span class="card-title">Company Overview</span></div>
     <div class="card-body">
-      ${frow('Business Model', d.business_model)}
-      ${frow('Industry', d.industry_vertical)}
-      ${frow('Founded', d.founding_year)}
-      ${frow('Employees', d.employee_count || d.employee_count_range)}
-      ${frow('Funding', d.funding_status || d.funding_stage)}
-      ${frow('Revenue Range', d.revenue_range)}
-      ${frow('HQ', d.hq_city ? `${d.hq_city}, ${d.geography||''}` : d.geography)}
-      ${frow('Readiness', d.experiential_readiness, verdictClass(d.experiential_readiness))}
-      ${frow('Recommended Service', d.recommended_service)}
+      ${kv('Business Model', d.business_model)}
+      ${kv('Industry', d.industry_vertical)}
+      ${kv('Founded', d.founding_year)}
+      ${kv('Employees', d.employee_count || d.employee_count_range)}
+      ${kv('Funding', d.funding_status || d.funding_stage)}
+      ${kv('Revenue', d.revenue_range)}
+      ${kv('HQ', d.hq_city ? `${d.hq_city}, ${d.geography || ''}` : d.geography)}
       ${d.company_narrative ? `<div class="card-note">${esc(d.company_narrative)}</div>` : ''}
     </div>`;
 }
 
-function renderMarketCard(d) {
-  $('card-market').innerHTML = `
-    <div class="card-head"><span class="card-title">Market Snapshot</span></div>
-    <div class="card-body">
-      ${frow('Share of Voice', d.share_of_voice_level, verdictClass(d.share_of_voice_level))}
-      ${frow('Sentiment', d.brand_sentiment, verdictClass(d.brand_sentiment))}
-      ${frow('Perception Gap', d.perception_gap_score ? `${d.perception_gap_score}/5` : null)}
-      ${frow('Sentiment Shift', d.recent_sentiment_shift)}
-      ${d.pitch_implication ? `<div class="insight-blue insight" style="margin-top:12px">💡 ${esc(d.pitch_implication)}</div>` : ''}
-    </div>`;
-}
-
-function renderReputationCard(d) {
-  $('card-reputation').innerHTML = `
-    <div class="card-head"><span class="card-title">Reputation</span>
-      ${d.reputation_label ? `<span class="badge ${verdictClass(d.reputation_label)==='g'?'bg':verdictClass(d.reputation_label)==='r'?'br':'ba'}">${d.reputation_label}</span>` : ''}
-    </div>
-    <div class="card-body">
-      ${frow('Score', d.overall_reputation_score ? `${d.overall_reputation_score}/100` : null)}
-      ${frow('NPS Signal', d.nps_signal)}
-      ${frow('Community', d.brand_community_strength)}
-      ${frow('Reddit', d.reddit_sentiment)}
-      ${(d.reddit_key_themes||[]).length ? `<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:4px">${d.reddit_key_themes.slice(0,5).map(t=>`<span class="badge">${esc(t)}</span>`).join('')}</div>` : ''}
-      ${d.reputation_opportunity ? `<div class="insight" style="margin-top:12px">🎯 ${esc(d.reputation_opportunity)}</div>` : ''}
-    </div>`;
-}
-
+/* Strategic Watchouts */
 function renderWatchoutsCard(d) {
-  const v = d.overall_verdict||'';
-  const cls = v==='GREEN'?'bg':v==='RED'?'br':'ba';
+  const v   = d.overall_verdict || '';
+  const cls = v === 'GREEN' ? 'green' : v === 'RED' ? 'red' : 'amber';
   $('card-watchouts').innerHTML = `
     <div class="card-head"><span class="card-title">Strategic Watchouts</span>
       ${v ? `<span class="badge ${cls}">${v}</span>` : ''}
     </div>
     <div class="card-body">
-      ${frow('Timing', d.timing_recommendation)}
-      ${frow('Tone Adjustment', d.pitch_tone_adjustment)}
-      ${(d.financial_distress_signals||[]).length ? `<div class="insight-red insight" style="margin-top:10px">⚠ ${esc(d.financial_distress_signals[0])}</div>` : ''}
-      ${(d.leadership_changes||[]).length ? `<div class="insight" style="margin-top:8px">🔄 ${esc(d.leadership_changes[0].change)} — ${esc(d.leadership_changes[0].implication||'')}</div>` : ''}
+      ${kv('Timing', d.timing_recommendation)}
+      ${kv('Tone', d.pitch_tone_adjustment)}
+      ${(d.financial_distress_signals || []).length ? `<div class="insight red" style="margin-top:10px">⚠ ${esc(d.financial_distress_signals[0])}</div>` : ''}
+      ${(d.leadership_changes || []).length ? `<div class="insight" style="margin-top:8px">🔄 ${esc(d.leadership_changes[0].change)} — ${esc(d.leadership_changes[0].implication || '')}</div>` : ''}
       ${d.verdict_reasoning ? `<div class="card-note">${esc(d.verdict_reasoning)}</div>` : ''}
     </div>`;
 }
 
+/* Reputation */
+function renderReputationCard(d) {
+  const lc  = verdictCls(d.reputation_label);
+  const lcl = lc === 'g' ? 'green' : lc === 'r' ? 'red' : lc === 'a' ? 'amber' : '';
+  $('card-reputation').innerHTML = `
+    <div class="card-head"><span class="card-title">Reputation</span>
+      ${d.reputation_label ? `<span class="badge ${lcl}">${esc(d.reputation_label)}</span>` : ''}
+    </div>
+    <div class="card-body">
+      ${kv('Score', d.overall_reputation_score ? `${d.overall_reputation_score}/100` : null)}
+      ${kv('NPS Signal', d.nps_signal)}
+      ${kv('Community', d.brand_community_strength)}
+      ${kv('Reddit', d.reddit_sentiment)}
+      ${(d.reddit_key_themes || []).length ? `<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:4px">${d.reddit_key_themes.slice(0,5).map(t => badge(t)).join('')}</div>` : ''}
+      ${d.reputation_opportunity ? `<div class="insight green" style="margin-top:12px">🎯 ${esc(d.reputation_opportunity)}</div>` : ''}
+    </div>`;
+}
+
+/* Pitch Timing */
 function renderTimingCard(d) {
   $('card-timing').innerHTML = `
     <div class="card-head"><span class="card-title">Pitch Timing Intelligence</span></div>
     <div class="card-body">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
         <div>
-          ${frow('Verdict', d.overall_verdict)}
-          ${frow('Recommendation', d.timing_recommendation)}
-          ${frow('Tone', d.pitch_tone_adjustment)}
+          ${kv('Verdict', d.overall_verdict, verdictCls(d.overall_verdict))}
+          ${kv('Recommendation', d.timing_recommendation)}
+          ${kv('Tone Adjustment', d.pitch_tone_adjustment)}
+          ${kv('Marketing Freeze', d.marketing_freeze_detected ? 'Detected' : null, 'r')}
         </div>
         <div>
-          ${(d.leadership_changes||[]).map(lc=>`
-            <div style="padding:8px;background:var(--bg3);border-radius:4px;margin-bottom:6px;font-size:12px">
-              <div style="color:var(--green2);font-family:var(--mono);font-size:10px">${esc(lc.role)} ${esc(lc.date||'')}</div>
-              <div style="margin-top:4px">${esc(lc.change)}</div>
-              <div style="color:var(--text3);font-size:11px;margin-top:3px">${esc(lc.implication||'')}</div>
+          ${(d.leadership_changes || []).map(lc => `
+            <div style="padding:10px 12px;background:var(--bg-2);border:1px solid var(--border);border-left:3px solid var(--green);border-radius:var(--radius-sm);margin-bottom:8px;font-size:12px">
+              <div style="color:var(--green);font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.05em">${esc(lc.role)} ${esc(lc.date || '')}</div>
+              <div style="margin-top:4px;color:var(--text)">${esc(lc.change)}</div>
+              <div style="color:var(--text-3);font-size:11px;margin-top:3px">${esc(lc.implication || '')}</div>
             </div>`).join('')}
         </div>
       </div>
     </div>`;
 }
 
+/* Brand Colours */
 function renderColorsCard(d) {
-  const colors  = d.primary_colors || d.extracted_colors || [];
-  const swatches = colors.slice(0,12).map(c=>`<div class="swatch" style="background:${esc(c)}" title="${esc(c)}"></div>`).join('');
+  const colors   = d.primary_colors || d.extracted_colors || [];
+  const swatches = colors.slice(0, 12).map(c =>
+    `<div class="swatch" style="background:${esc(c)}" title="${esc(c)}"></div>`).join('');
   $('card-colors').innerHTML = `
     <div class="card-head"><span class="card-title">Brand Colours</span></div>
     <div class="card-body">
-      ${swatches ? `<div class="swatch-row">${swatches}</div>` : '<span style="color:var(--text3)">No colours extracted</span>'}
-      <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">
-        ${colors.slice(0,6).map(c=>`<span class="badge" style="font-family:var(--mono);font-size:9px">${esc(c)}</span>`).join('')}
+      ${swatches ? `<div class="swatch-row">${swatches}</div>` : ''}
+      <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">
+        ${colors.slice(0, 6).map(c => `<span class="badge" style="font-family:var(--mono);font-size:9px">${esc(c)}</span>`).join('')}
       </div>
-      ${frow('Brand Tone', d.brand_tone)}
-      ${frow('Visual Style', d.visual_style)}
-      ${frow('Brand Maturity', d.brand_maturity)}
+      ${kv('Brand Tone', d.brand_tone)}
+      ${kv('Visual Style', d.visual_style)}
+      ${kv('Brand Maturity', d.brand_maturity)}
       ${d.experiential_design_angle ? `<div class="insight" style="margin-top:12px">🎨 ${esc(d.experiential_design_angle)}</div>` : ''}
     </div>`;
 }
 
+/* Brand Voice */
 function renderVoiceCard(d) {
-  const kw = d.brand_voice_keywords || [];
+  const kw    = d.brand_voice_keywords || [];
   const fonts = d.primary_fonts || d.extracted_fonts || [];
   $('card-voice').innerHTML = `
     <div class="card-head"><span class="card-title">Brand Voice & Typography</span></div>
     <div class="card-body">
-      ${frow('Primary Font', fonts[0]||null)}
-      ${frow('Secondary Font', fonts[1]||null)}
-      ${frow('Tagline', d.tagline)}
-      ${frow('Logo Style', d.logo_style)}
-      ${kw.length ? `<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:5px">${kw.map(k=>`<span class="badge bg">${esc(k)}</span>`).join('')}</div>` : ''}
-      ${(d.missing_brand_elements||[]).length ? `<div class="insight-amber insight" style="margin-top:12px">📌 Missing: ${esc(d.missing_brand_elements.join(' · '))}</div>` : ''}
+      ${kv('Primary Font', fonts[0] || null)}
+      ${kv('Secondary Font', fonts[1] || null)}
+      ${kv('Tagline', d.tagline)}
+      ${kv('Logo Style', d.logo_style)}
+      ${kw.length ? `<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:5px">${kw.map(k => badge(k, 'indigo')).join('')}</div>` : ''}
+      ${(d.missing_brand_elements || []).length ? `<div class="insight amber" style="margin-top:12px">📌 Missing: ${esc(d.missing_brand_elements.join(' · '))}</div>` : ''}
     </div>`;
 }
 
+/* Competitors */
 function renderCompetitorsCard(d) {
   const comps = d.competitors || [];
-  const rows  = comps.slice(0,5).map(c=>`
+  const rows  = comps.slice(0, 5).map(c => `
     <tr>
-      <td>${esc(c.name||'—')}</td>
-      <td>${esc(c.brand_positioning||'—')}</td>
-      <td>${esc(c.events_activity||'—')}</td>
-      <td style="color:var(--text3);font-size:11px">${esc(c.experiential_gap||'—')}</td>
-      <td>${badge(c.threat_level_to_brand, c.threat_level_to_brand==='HIGH'?'br':c.threat_level_to_brand==='LOW'?'bg':'ba')}</td>
+      <td>${esc(c.name || '—')}</td>
+      <td>${esc(c.brand_positioning || '—')}</td>
+      <td>${esc(c.events_activity || '—')}</td>
+      <td style="color:var(--text-3);font-size:11px">${esc(c.experiential_gap || '—')}</td>
+      <td>${badge(c.threat_level_to_brand, c.threat_level_to_brand === 'HIGH' ? 'red' : c.threat_level_to_brand === 'LOW' ? 'green' : 'amber')}</td>
     </tr>`).join('');
   $('card-competitors').innerHTML = `
     <div class="card-head"><span class="card-title">Competitor Mapping</span>
-      ${d.competitive_urgency==='YES' ? `<span class="badge br">⚡ Competitor active</span>` : ''}
+      ${d.competitive_urgency === 'YES' ? `<span class="badge red">⚡ Competitor active</span>` : ''}
     </div>
     <div class="card-body">
       ${rows ? `<div style="overflow-x:auto"><table class="comp-table">
         <thead><tr><th>Brand</th><th>Positioning</th><th>Events</th><th>Their Gap</th><th>Threat</th></tr></thead>
-        <tbody>${rows}</tbody></table></div>` : '<span style="color:var(--text3)">No competitors identified</span>'}
+        <tbody>${rows}</tbody></table></div>` : '<span style="color:var(--text-3)">No competitors identified</span>'}
       ${d.experiential_white_space ? `<div class="insight" style="margin-top:14px">🎯 White space: ${esc(d.experiential_white_space)}</div>` : ''}
     </div>`;
 }
 
+/* Market Position */
 function renderPositionCard(d) {
   $('card-position').innerHTML = `
     <div class="card-head"><span class="card-title">Market Position</span></div>
     <div class="card-body">
-      ${frow('Share of Voice', d.share_of_voice_level, verdictClass(d.share_of_voice_level))}
-      ${frow('Sentiment', d.brand_sentiment, verdictClass(d.brand_sentiment))}
-      ${frow('Category Leader Claim', d.category_leadership_claim ? 'Yes' : 'No')}
-      ${frow('Claim Verified', d.leadership_claim_verified ? 'Yes' : 'No')}
-      ${frow('Perception Gap', d.perception_gap_score ? `${d.perception_gap_score}/5` : null)}
-      ${(d.sentiment_signals||[]).length ? `<div class="card-note">${d.sentiment_signals.slice(0,2).map(s=>`"${esc(s)}"`).join('<br>')}</div>` : ''}
+      ${kv('Share of Voice', d.share_of_voice_level, verdictCls(d.share_of_voice_level))}
+      ${kv('Sentiment', d.brand_sentiment, verdictCls(d.brand_sentiment))}
+      ${kv('Perception Gap', d.perception_gap_score ? `${d.perception_gap_score}/5` : null)}
+      ${kv('Sentiment Shift', d.recent_sentiment_shift)}
+      ${d.pitch_implication ? `<div class="insight" style="margin-top:12px">💡 ${esc(d.pitch_implication)}</div>` : ''}
       ${d.market_position_summary ? `<div class="card-note">${esc(d.market_position_summary)}</div>` : ''}
     </div>`;
 }
 
+/* Brand Activity */
 function renderActivityCard(d) {
   const campaigns = d.recent_campaigns || [];
   $('card-activity').innerHTML = `
     <div class="card-head"><span class="card-title">Brand Activity</span>
-      ${d.budget_signal ? `<span class="badge ${d.budget_signal==='HIGH'?'bg':d.budget_signal==='LOW'?'br':'ba'}">${d.budget_signal} budget</span>` : ''}
+      ${d.budget_signal ? `<span class="badge ${d.budget_signal === 'HIGH' ? 'green' : d.budget_signal === 'LOW' ? 'red' : 'amber'}">${esc(d.budget_signal)} budget</span>` : ''}
     </div>
     <div class="card-body">
-      ${frow('Content Cadence', d.social_content_cadence)}
-      ${frow('PR Activity', d.pr_activity_level)}
-      ${frow('Seasonal Pattern', d.seasonal_pattern)}
-      ${frow('Opportunity Window', d.upcoming_opportunity_window)}
-      ${frow('Last Campaign', d.last_major_campaign)}
-      ${campaigns.length ? `<div style="margin-top:12px;display:flex;flex-direction:column;gap:6px">
-        ${campaigns.slice(0,3).map(c=>`<div style="padding:8px 10px;background:var(--bg3);border-radius:4px;font-size:12px">
-          <span style="color:var(--green2);font-weight:600">${esc(c.name||'?')}</span>
-          <span style="color:var(--text3);margin:0 6px">·</span>
-          <span class="badge">${esc(c.channel||'?')}</span>
-          <span style="color:var(--text3);margin-left:6px;font-size:11px">${esc(c.date||'')}</span>
-          ${c.description ? `<div style="color:var(--text2);margin-top:4px;font-size:11px">${esc(c.description)}</div>` : ''}
-        </div>`).join('')}
+      ${kv('Content Cadence', d.social_content_cadence)}
+      ${kv('PR Activity', d.pr_activity_level)}
+      ${kv('Seasonal Pattern', d.seasonal_pattern)}
+      ${kv('Next Window', d.upcoming_opportunity_window)}
+      ${kv('Last Campaign', d.last_major_campaign)}
+      ${campaigns.length ? `<div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
+        ${campaigns.slice(0, 3).map(c => `
+          <div style="padding:10px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm)">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+              <span style="font-weight:600;font-size:13px;color:var(--text)">${esc(c.name || '?')}</span>
+              ${badge(c.channel || '?')}
+              <span style="font-size:11px;color:var(--text-3)">${esc(c.date || '')}</span>
+            </div>
+            ${c.description ? `<div style="font-size:12px;color:var(--text-3)">${esc(c.description)}</div>` : ''}
+          </div>`).join('')}
       </div>` : ''}
       ${d.activity_summary ? `<div class="card-note">${esc(d.activity_summary)}</div>` : ''}
     </div>`;
 }
 
+/* Events */
 function renderEventsCard(d) {
   const events = d.events_timeline || [];
   const score  = d.experiential_maturity_score;
-  const pct    = score ? (score/5)*100 : 0;
+  const pct    = score ? (score / 5) * 100 : 0;
+  const sColor = score >= 4 ? 'green' : score >= 2 ? '' : 'amber';
 
-  const eventCards = events.slice(0,8).map(ev=>`
+  const eventCards = events.slice(0, 8).map(ev => `
     <div class="event-card">
       <div class="event-head">
-        <span class="event-name">${esc(ev.event_name||ev.name||'Untitled')}</span>
-        <span class="event-date">${esc(ev.date||ev.year||'')}</span>
+        <span class="event-name">${esc(ev.event_name || ev.name || 'Untitled')}</span>
+        <span class="event-date">${esc(ev.date || ev.year || '')}</span>
       </div>
       <div class="event-badges">
-        ${badge(ev.format,'bb')}
+        ${badge(ev.format, 'blue')}
         ${badge(ev.scale)}
-        ${ev.location?badge('📍 '+ev.location):''}
-        ${badge(ev.brand_role,'bg')}
-        ${badge(ev.production_quality,'ba')}
+        ${ev.location ? badge('📍 ' + ev.location) : ''}
+        ${badge(ev.brand_role, 'green')}
+        ${badge(ev.production_quality, 'amber')}
       </div>
-      ${ev.source&&ev.source!=='inferred from brand scale / training knowledge'?`<div style="margin-top:6px;font-size:11px;color:var(--text3)">Source: ${esc(ev.source.slice(0,100))}</div>`:''}
+      ${ev.source && ev.source !== 'inferred from brand scale / training knowledge'
+        ? `<div style="margin-top:6px;font-size:11px;color:var(--text-3)">${esc(ev.source.slice(0,100))}</div>` : ''}
     </div>`).join('');
 
   $('card-events').innerHTML = `
     <div class="card-head">
       <span class="card-title">Experiential Footprint</span>
-      ${score ? `<span style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--green);text-shadow:var(--glow-sm)">${score}<span style="font-size:12px;color:var(--text3)">/5</span></span>` : ''}
+      ${score ? `<span style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--green)">${score}<span style="font-size:12px;color:var(--text-3)">/5</span></span>` : ''}
     </div>
     <div class="card-body">
-      <div style="margin-bottom:14px">
-        <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:4px">
-          <span>MATURITY SCORE</span><span>${score||'?'}/5</span>
+      <div style="margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--text-3);margin-bottom:5px">
+          <span>MATURITY SCORE</span><span>${score || '?'}/5</span>
         </div>
-        <div class="score-bar-wrap" style="height:6px"><div class="score-bar" style="width:${pct}%"></div></div>
-        <div style="font-size:11px;color:var(--text3);margin-top:4px">${esc(d.maturity_score_reasoning||'')}</div>
+        <div class="score-bar-outer"><div class="score-bar-inner ${sColor}" style="width:${pct}%"></div></div>
+        ${d.maturity_score_reasoning ? `<div style="font-size:11px;color:var(--text-3);margin-top:4px">${esc(d.maturity_score_reasoning)}</div>` : ''}
       </div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
-        ${frow('Frequency', d.events_frequency)}
-        ${frow('Last Event', d.last_event_months_ago!=null ? `${d.last_event_months_ago} months ago` : null)}
-        ${(d.geography_of_events||[]).length ? `<div class="frow" style="width:100%"><span class="fkey">Geography</span><span class="fval">${esc(d.geography_of_events.join(' · '))}</span></div>` : ''}
+      <div style="margin-bottom:14px">
+        ${kv('Frequency', d.events_frequency)}
+        ${kv('Last Event', d.last_event_months_ago != null ? `${d.last_event_months_ago} months ago` : null)}
+        ${(d.geography_of_events || []).length ? kv('Geography', d.geography_of_events.join(' · ')) : ''}
       </div>
-      ${events.length ? eventCards : '<div style="color:var(--text3);padding:20px 0;text-align:center;font-family:var(--mono);font-size:12px">No confirmed events in search data — using model knowledge</div>'}
-      ${(d.formats_used||[]).length ? `<div style="margin-top:12px"><div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Formats Used</div><div style="display:flex;flex-wrap:wrap;gap:4px">${d.formats_used.map(f=>badge(f,'bg')).join('')}</div></div>` : ''}
-      ${(d.formats_missing||[]).length ? `<div class="insight-amber insight" style="margin-top:12px">📌 Missing formats: ${esc(d.formats_missing.join(' · '))}</div>` : ''}
+      ${events.length ? eventCards : '<div style="color:var(--text-3);padding:20px 0;text-align:center;font-family:var(--mono);font-size:12px">No confirmed events in research data</div>'}
+      ${(d.formats_used || []).length ? `<div style="margin-top:14px"><div style="font-family:var(--mono);font-size:10px;color:var(--text-3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Formats Used</div><div style="display:flex;flex-wrap:wrap;gap:4px">${d.formats_used.map(f => badge(f, 'green')).join('')}</div></div>` : ''}
+      ${(d.formats_missing || []).length ? `<div class="insight amber" style="margin-top:12px">📌 Missing formats: ${esc(d.formats_missing.join(' · '))}</div>` : ''}
       ${d.pitch_angle ? `<div class="insight" style="margin-top:10px">🎯 ${esc(d.pitch_angle)}</div>` : ''}
-      ${d.opening_line_for_pitch ? `<div style="margin-top:10px;padding:12px 14px;background:rgba(0,255,65,.05);border:1px solid var(--gborder);border-radius:6px;font-size:12px;font-style:italic;color:var(--text2)">"${esc(d.opening_line_for_pitch)}"</div>` : ''}
+      ${d.opening_line_for_pitch ? `<div style="margin-top:12px;padding:12px 14px;background:var(--indigo-dim);border:1px solid var(--indigo-border);border-radius:var(--radius-sm);font-size:13px;font-style:italic;color:#818CF8">"${esc(d.opening_line_for_pitch)}"</div>` : ''}
     </div>`;
 }
 
+/* People */
 function renderPeopleCard(p09, p10) {
   const people   = p09.buying_committee || [];
   const contacts = p10.contacts || [];
   const cmap     = {};
-  contacts.forEach(c => { if(c.name) cmap[c.name] = c; });
+  contacts.forEach(c => { if (c.name) cmap[c.name] = c; });
 
   const cards = people.map(p => {
     const ct    = cmap[p.name] || {};
-    const email = ct.email || '—';
+    const email = ct.email || '';
     const conf  = ct.email_confidence ? `${ct.email_confidence}%` : '';
     const score = p.decision_relevance_score || 0;
+    const ini   = initials(p.name);
     return `
     <div class="person-card">
-      <div class="person-name">${esc(p.name||'—')}</div>
-      <div class="person-title">${esc(p.title||'—')} ${p.role_type?`<span class="badge" style="margin-left:4px">${esc(p.role_type)}</span>`:''}</div>
-      <div class="person-score"><div class="person-score-fill" style="width:${score*20}%"></div></div>
-      <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:8px">Decision relevance ${score}/5</div>
-      <div class="person-meta">
-        ${p.outreach_priority==='PRIMARY'?badge('PRIMARY','bg'):p.outreach_priority==='SECONDARY'?badge('SECONDARY','ba'):''}
-        ${p.linkedin_activity?badge('LinkedIn: '+p.linkedin_activity):''}
-        ${email!=='—'?badge('✉ '+email+(conf?' ('+conf+')':''),'bb'):''}
-        ${ct.recommended_channel?badge(ct.recommended_channel):''}
+      <div class="person-avatar">${ini}</div>
+      <div class="person-name">${esc(p.name || '—')}</div>
+      <div class="person-title">${esc(p.title || '—')}</div>
+      <div class="person-score-label">Decision Relevance ${score}/5</div>
+      <div class="person-score-bar"><div class="person-score-fill" style="width:${score * 20}%"></div></div>
+      <div class="person-meta" style="margin-top:8px">
+        ${p.outreach_priority === 'PRIMARY' ? badge('PRIMARY', 'green') : p.outreach_priority === 'SECONDARY' ? badge('SECONDARY', 'amber') : ''}
+        ${p.role_type ? badge(p.role_type) : ''}
+        ${p.linkedin_activity ? badge('LinkedIn: ' + p.linkedin_activity) : ''}
+        ${email ? badge('✉ ' + email + (conf ? ' (' + conf + ')' : ''), 'blue') : ''}
+        ${ct.recommended_channel ? badge(ct.recommended_channel) : ''}
       </div>
-      ${p.personalisation_hook?`<div class="person-hook">💡 ${esc(p.personalisation_hook)}</div>`:''}
+      ${p.personalisation_hook ? `<div class="person-hook">💡 ${esc(p.personalisation_hook)}</div>` : ''}
     </div>`;
   }).join('');
 
   $('card-people').innerHTML = `
     <div class="card-head"><span class="card-title">Decision Makers & Contact Intelligence</span>
-      ${p09.primary_contact?`<span class="badge bg">Primary: ${esc(p09.primary_contact)}</span>`:''}
+      ${people.length ? `<span class="badge indigo">${people.length} stakeholder${people.length !== 1 ? 's' : ''}</span>` : ''}
     </div>
     <div class="card-body">
-      ${cards || '<div style="color:var(--text3);padding:16px 0;font-family:var(--mono);font-size:12px">No decision makers found — try broader Google searches</div>'}
-      ${p10.email_pattern?`<div style="margin-top:14px;padding:10px 14px;background:var(--bg3);border-radius:6px;font-family:var(--mono);font-size:11px;color:var(--text3)">Email pattern: <span style="color:var(--green2)">${esc(p10.email_pattern)}@${esc(p10.domain||'?')}</span> · ${p10.verified_emails||0} verified · ${p10.inferred_emails||0} inferred</div>`:''}
-      ${p10.data_disclaimer?`<div style="margin-top:8px;font-size:11px;color:var(--text3)">⚠ ${esc(p10.data_disclaimer)}</div>`:''}
+      <div class="people-grid">
+        ${cards || '<div style="color:var(--text-3);padding:16px 0;font-family:var(--mono);font-size:12px">No decision makers found</div>'}
+      </div>
+      ${p10.email_pattern ? `<div class="email-pattern-bar">
+        Email pattern: <strong style="color:var(--indigo)">${esc(p10.email_pattern)}@${esc(p10.domain || '?')}</strong>
+        <span>· ${p10.verified_emails || 0} verified</span>
+        <span>· ${p10.inferred_emails || 0} inferred</span>
+      </div>` : ''}
+      ${p10.data_disclaimer ? `<div style="margin-top:8px;font-size:11px;color:var(--text-3)">⚠ ${esc(p10.data_disclaimer)}</div>` : ''}
     </div>`;
 }
 
-function renderOutreachCard(d) {
-  const seq     = d.outreach_sequence || {};
-  const primary = d.primary_contact || {};
-  const touches = Object.entries(seq);
+/* ════════════════════════════════════════════════════════
+   OUTREACH — MULTI-PERSON
+════════════════════════════════════════════════════════ */
+function renderOutreachSection(d, p09) {
+  const section = $('outreach-section');
+  if (!section) return;
 
-  if (!touches.length) {
-    $('card-outreach').innerHTML = `<div class="card-head"><span class="card-title">Outreach Sequence</span></div><div class="card-body"><div style="color:var(--text3)">No sequence generated</div></div>`;
+  // Collect sequences: new multi-contact format or legacy single
+  let sequences = (d.contacts_sequences || []).filter(s => s.contact && s.sequence);
+  if (!sequences.length && d.outreach_sequence) {
+    const primary = d.primary_contact || {};
+    // Try to enrich from p09
+    const p09Contact = (p09.buying_committee || []).find(c => c.name === primary.name) || {};
+    sequences = [{
+      contact: {
+        ...primary,
+        personalisation_hook: p09Contact.personalisation_hook || '',
+        role_type: p09Contact.role_type || '',
+        outreach_priority: p09Contact.outreach_priority || 'PRIMARY',
+        decision_relevance_score: p09Contact.decision_relevance_score || 0,
+      },
+      sequence: d.outreach_sequence,
+      personalisation_vars: d.personalisation_variables_used || {},
+    }];
+  }
+
+  if (!sequences.length) {
+    section.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text-3);font-family:var(--mono);font-size:13px">No outreach sequences generated</div>`;
     return;
   }
 
-  const compUsed = (d.competitor_intel_used||[]).filter(c=>c.name).map(c=>c.name);
-  const vars     = d.personalisation_variables_used || {};
+  currentSeqs   = sequences;
+  activeContact = 0;
 
-  const touchHtml = touches.map(([key, t]) => {
-    const isLI = (t.channel||'').toLowerCase() === 'linkedin';
+  const compUsed = (d.competitor_intel_used || []).filter(c => c.name).map(c => c.name);
+
+  /* Contact tabs */
+  const tabsHtml = sequences.map((s, i) => {
+    const c   = s.contact || {};
+    const ini = initials(c.name || '?');
+    const pri = c.outreach_priority === 'PRIMARY';
     return `
-    <div class="touch-card ${isLI?'ch-linkedin':''}">
-      <div class="touch-head">
-        <span class="touch-ch">${esc(t.channel||key)}</span>
-        <span class="touch-day">Day ${t.send_day||'—'}</span>
+    <button class="oct ${i === 0 ? 'active' : ''}" onclick="selectContact(${i})">
+      <div class="oct-avatar">${ini}</div>
+      <div class="oct-info">
+        <div class="oct-name">${esc(c.name || '—')}</div>
+        <div class="oct-title">${esc((c.title || '').slice(0, 28))}${(c.title || '').length > 28 ? '…' : ''}</div>
       </div>
-      ${t.subject_line?`<div class="touch-subj">📧 ${esc(t.subject_line)}</div>`:''}
-      <div class="touch-body">${esc(t.message||'—')}</div>
+      ${pri ? `<span class="oct-badge">PRIMARY</span>` : ''}
+    </button>`;
+  }).join('');
+
+  section.innerHTML = `
+    <div class="outreach-contacts-header">
+      <span class="outreach-contacts-label">${sequences.length} Personalised Sequence${sequences.length !== 1 ? 's' : ''}</span>
+      <div class="outreach-contact-tabs" id="outreach-contact-tabs">${tabsHtml}</div>
+    </div>
+    <div id="outreach-sequence-view"></div>`;
+
+  renderContactSequence(0, sequences, compUsed);
+}
+
+function renderContactSequence(idx, sequences, compUsed) {
+  const view = $('outreach-sequence-view');
+  if (!view) return;
+  const item = sequences[idx];
+  if (!item) return;
+
+  const c    = item.contact   || {};
+  const seq  = item.sequence  || {};
+  const vars = item.personalisation_vars || {};
+
+  const touches = Object.entries(seq)
+    .filter(([, t]) => t && typeof t === 'object')
+    .sort(([a], [b]) => {
+      const na = parseInt(a.replace(/\D/g, '')) || 0;
+      const nb = parseInt(b.replace(/\D/g, '')) || 0;
+      return na - nb;
+    });
+
+  const touchesHtml = touches.map(([key, t]) => {
+    const isLI   = (t.channel || '').toLowerCase() === 'linkedin';
+    const chCls  = isLI ? 'linkedin' : 'email';
+    return `
+    <div class="touch-card">
+      <div class="touch-header">
+        <span class="touch-day-badge">Day ${t.send_day || '—'}</span>
+        <span class="touch-channel-badge ${chCls}">${esc(t.channel || key)}</span>
+        ${t.subject_line ? `<span class="touch-subj">${esc(t.subject_line)}</span>` : ''}
+      </div>
+      <div class="touch-body">${esc(t.message || '—')}</div>
     </div>`;
   }).join('');
 
-  $('card-outreach').innerHTML = `
-    <div class="card-head">
-      <span class="card-title">Personalised 4-Touch Outreach</span>
-      ${primary.name?`<span class="badge bp">→ ${esc(primary.name)}</span>`:''}
-    </div>
-    <div class="card-body">
-      ${primary.name||primary.email||primary.linkedin ? `
-      <div style="padding:10px 14px;background:var(--bg3);border-radius:6px;margin-bottom:16px;font-size:12px;display:flex;flex-wrap:wrap;gap:12px">
-        ${primary.name?`<span style="font-weight:600">${esc(primary.name)}</span>`:''}
-        ${primary.title?`<span style="color:var(--text3)">${esc(primary.title)}</span>`:''}
-        ${primary.email?badge('✉ '+primary.email,'bb'):''}
-        ${primary.linkedin?`<a href="${esc(primary.linkedin)}" target="_blank" class="badge bb" style="text-decoration:none">LinkedIn ↗</a>`:''}
+  const sidebarHtml = `
+    <div class="outreach-sidebar">
+      <div class="outreach-intel-card">
+        <div class="outreach-intel-header">Contact Profile</div>
+        <div class="outreach-intel-body">
+          <div class="intel-row">
+            <span class="intel-label">Name</span>
+            <span class="intel-value highlight">${esc(c.name || '—')}</span>
+          </div>
+          <div class="intel-row">
+            <span class="intel-label">Title</span>
+            <span class="intel-value">${esc(c.title || '—')}</span>
+          </div>
+          ${c.email ? `<div class="intel-row"><span class="intel-label">Email</span><span class="intel-value highlight">${esc(c.email)}</span></div>` : ''}
+          ${c.linkedin ? `<div class="intel-row"><span class="intel-label">LinkedIn</span><a href="${esc(c.linkedin)}" target="_blank" class="intel-value" style="color:var(--blue)">View ↗</a></div>` : ''}
+          ${c.decision_relevance_score ? `<div class="intel-row"><span class="intel-label">Relevance</span><span class="intel-value">${c.decision_relevance_score}/5</span></div>` : ''}
+        </div>
+      </div>
+      ${vars.signal || vars.pain_point ? `
+      <div class="outreach-intel-card">
+        <div class="outreach-intel-header">Personalisation Variables</div>
+        <div class="outreach-intel-body">
+          ${vars.signal ? `<div class="intel-row"><span class="intel-label">Signal Used</span><span class="intel-value">${esc(vars.signal)}</span></div>` : ''}
+          ${vars.pain_point ? `<div class="intel-row"><span class="intel-label">Pain Point</span><span class="intel-value highlight">${esc(vars.pain_point)}</span></div>` : ''}
+          ${vars.competitor_used ? `<div class="intel-row"><span class="intel-label">Competitor</span><span class="intel-value">${esc(vars.competitor_used)}</span></div>` : ''}
+          ${vars.watchout ? `<div class="intel-row"><span class="intel-label">Watchout</span><span class="intel-value">${esc(vars.watchout)}</span></div>` : ''}
+        </div>
       </div>` : ''}
-      ${compUsed.length?`<div style="margin-bottom:14px;font-family:var(--mono);font-size:11px;color:var(--text3)">Competitors referenced: ${compUsed.map(c=>`<span class="badge ba" style="margin-right:3px">${esc(c)}</span>`).join('')}</div>`:''}
-      ${touchHtml}
-      ${vars.signal||vars.gap ? `<div style="margin-top:14px;padding:10px 14px;background:var(--bg3);border-radius:6px;font-family:var(--mono);font-size:10px;color:var(--text3)">
-        ${vars.signal?`<div>Signal used: <span style="color:var(--text2)">${esc(vars.signal)}</span></div>`:''}
-        ${vars.gap?`<div>Gap angle: <span style="color:var(--text2)">${esc(vars.gap)}</span></div>`:''}
-        ${vars.watchout?`<div>Watchout: <span class="badge ${vars.watchout==='GREEN'?'bg':vars.watchout==='RED'?'br':'ba'}" style="margin-left:4px">${esc(vars.watchout)}</span></div>`:''}
+      ${c.personalisation_hook ? `
+      <div class="outreach-intel-card">
+        <div class="outreach-intel-header">Hook</div>
+        <div class="outreach-intel-body">
+          <div style="font-size:12px;color:var(--text-2);line-height:1.6;font-style:italic">"${esc(c.personalisation_hook)}"</div>
+        </div>
       </div>` : ''}
+      ${compUsed.length ? `
+      <div class="outreach-intel-card">
+        <div class="outreach-intel-header">Competitor Intel Used</div>
+        <div class="outreach-intel-body">
+          <div class="comp-tags">${compUsed.map(c => badge(c, 'amber')).join('')}</div>
+        </div>
+      </div>` : ''}
+    </div>`;
+
+  view.innerHTML = `
+    <div class="outreach-body">
+      <div class="outreach-sequence">${touchesHtml || '<div style="color:var(--text-3);padding:20px 0">No touches generated</div>'}</div>
+      ${sidebarHtml}
     </div>`;
 }
 
+window.selectContact = function(idx) {
+  activeContact = idx;
+  const compUsed = (currentReport?.pipelines?.p11_outreach?.output?.competitor_intel_used || [])
+    .filter(c => c.name).map(c => c.name);
+
+  document.querySelectorAll('.oct').forEach((el, i) => el.classList.toggle('active', i === idx));
+  renderContactSequence(idx, currentSeqs, compUsed);
+};
+
+/* Tracking */
 function renderTrackingCard(d) {
   const records = d.tracking_records || [];
-  const rows = records.map(r => {
+  const rows    = records.map(r => {
     const dash = r.dashboard_entry || {};
     return `
     <div class="track-row">
       <div>
-        <div class="track-name">${esc(r.contact_name||'—')}</div>
-        <div class="track-id">${esc(r.tracking_id||'')}</div>
-        ${r.contact_email?`<div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:2px">${esc(r.contact_email)}</div>`:''}
+        <div class="track-name">${esc(r.contact_name || '—')}</div>
+        <div class="track-id">${esc(r.tracking_id || '')}</div>
+        ${r.contact_email ? `<div style="font-family:var(--mono);font-size:10px;color:var(--text-3);margin-top:2px">${esc(r.contact_email)}</div>` : ''}
       </div>
       <div style="display:flex;gap:6px;align-items:center">
-        ${badge(dash.status||'NOT_SENT')}
-        ${badge(dash.next_action||'Send Touch 1','bg')}
+        ${badge(dash.status || 'NOT_SENT')}
+        ${badge(dash.next_action || 'Send Touch 1', 'green')}
       </div>
-      <div class="track-score">${dash.engagement_score??0}</div>
+      <div class="track-score">${dash.engagement_score ?? 0}</div>
     </div>`;
   }).join('');
 
   $('card-tracking').innerHTML = `
     <div class="card-head"><span class="card-title">Engagement Tracking</span></div>
     <div class="card-body">
-      ${rows || '<div style="color:var(--text3);font-family:var(--mono);font-size:12px">No tracking records yet</div>'}
-      <div style="margin-top:16px;padding:12px 14px;background:var(--bg3);border-radius:6px;font-family:var(--mono);font-size:10px;color:var(--text3);line-height:1.9">
-        <div>Scoring: open +1 · click +5 · reply +10 · meeting +20</div>
-        <div style="margin-top:4px">HOT ≥20 · WARM ≥10 · ENGAGED ≥3 · OPENED ≥1</div>
-        <div style="margin-top:4px">Pixel URL: ${esc(d.tracking_base_url||'—')}/open/{id}</div>
+      <div class="track-grid">
+        ${rows || '<div style="color:var(--text-3);font-family:var(--mono);font-size:12px;padding:16px 0">No tracking records yet</div>'}
+      </div>
+      <div class="scoring-model">
+        <div>open +1 · click +5 · reply +10 · meeting +20</div>
+        <div>HOT ≥20 · WARM ≥10 · ENGAGED ≥3 · OPENED ≥1</div>
+        <div style="grid-column:span 2">Pixel: ${esc(d.tracking_base_url || '—')}/open/{id}</div>
       </div>
     </div>`;
 }
 
-/* ══════════════════════════════════════════════════
-   PDF EXPORT
-══════════════════════════════════════════════════ */
-function openExportPDF() {
+/* ════════════════════════════════════════════════════════
+   PDF EXPORT — iframe approach, no popup blockers
+════════════════════════════════════════════════════════ */
+function exportPDF() {
   if (!currentReport) { toast('No report loaded'); return; }
-  const html = buildPDFHTML(currentReport);
-  const win  = window.open('', '_blank');
-  if (!win) { toast('Allow popups to export PDF'); return; }
-  win.document.write(html);
-  win.document.close();
-  win.onload = () => setTimeout(() => win.print(), 600);
+  toast('Preparing PDF…');
+  const html   = buildPDFHTML(currentReport);
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;border:none;opacity:0;pointer-events:none;';
+  iframe.srcdoc = html;
+  document.body.appendChild(iframe);
+  iframe.onload = () => {
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      setTimeout(() => iframe.parentNode?.removeChild(iframe), 4000);
+    }, 400);
+  };
 }
-window.openExportPDF = openExportPDF;
+window.exportPDF = exportPDF;
 
 function buildPDFHTML(data) {
   const pipes = data.pipelines || {};
   const pout  = key => (pipes[key] || {}).output || {};
-  const p01=pout('p01_company_overview'), p02=pout('p02_brand_identity'),
-        p03=pout('p03_market_position'),  p04=pout('p04_competitor_mapping'),
-        p05=pout('p05_brand_activity'),   p06=pout('p06_experiential_footprint'),
-        p07=pout('p07_reputation_research'), p08=pout('p08_strategic_watchouts'),
-        p09=pout('p09_decision_makers'),  p10=pout('p10_contact_intelligence'),
-        p11=pout('p11_outreach');
+  const p01 = pout('p01_company_overview');
+  const p02 = pout('p02_brand_identity');
+  const p03 = pout('p03_market_position');
+  const p04 = pout('p04_competitor_mapping');
+  const p05 = pout('p05_brand_activity');
+  const p06 = pout('p06_experiential_footprint');
+  const p07 = pout('p07_reputation_research');
+  const p08 = pout('p08_strategic_watchouts');
+  const p09 = pout('p09_decision_makers');
+  const p10 = pout('p10_contact_intelligence');
+  const p11 = pout('p11_outreach');
 
-  const e = esc;
+  const e   = esc;
   const icp = p01.icp_fit_score || 0;
-  const icpColour = icp>=70?'#00cc34':icp>=40?'#ffaa00':'#ff3b3b';
+  const icpCol = icp >= 70 ? '#10B981' : icp >= 40 ? '#F59E0B' : '#EF4444';
 
-  function svgGauge(pct, colour, size=80) {
-    const r=28, cx=size/2, cy=size/2+8, circ=Math.PI*r;
-    const offset = circ*(1-pct/100);
-    return `<svg width="${size}" height="${size*0.7}" viewBox="0 0 ${size} ${size*0.7}">
-      <path d="M${cx-r},${cy} A${r},${r},0,0,1,${cx+r},${cy}" fill="none" stroke="#1e1e1e" stroke-width="6"/>
-      <path d="M${cx-r},${cy} A${r},${r},0,0,1,${cx+r},${cy}" fill="none" stroke="${colour}" stroke-width="6"
-        stroke-dasharray="${circ}" stroke-dashoffset="${offset}" stroke-linecap="round"/>
-      <text x="${cx}" y="${cy-2}" text-anchor="middle" fill="${colour}" font-size="16" font-weight="700" font-family="monospace">${pct}</text>
+  function svgGauge(pct, colour, size = 80) {
+    const r = 28, cx = size / 2, cy = size / 2 + 8, circ = Math.PI * r;
+    const offset = circ * (1 - pct / 100);
+    return `<svg width="${size}" height="${Math.round(size * 0.7)}" viewBox="0 0 ${size} ${Math.round(size * 0.7)}">
+      <path d="M${cx - r},${cy} A${r},${r},0,0,1,${cx + r},${cy}" fill="none" stroke="#1F2937" stroke-width="6"/>
+      <path d="M${cx - r},${cy} A${r},${r},0,0,1,${cx + r},${cy}" fill="none" stroke="${colour}" stroke-width="6"
+        stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" stroke-linecap="round"/>
+      <text x="${cx}" y="${cy - 2}" text-anchor="middle" fill="${colour}" font-size="16" font-weight="700" font-family="'Inter',monospace">${pct}</text>
     </svg>`;
   }
 
-  function hBar(val, max, colour='#00cc34') {
-    const pct = Math.round((val/max)*100);
-    return `<div style="height:6px;background:#1e1e1e;border-radius:3px;overflow:hidden;margin:4px 0">
-      <div style="height:100%;width:${pct}%;background:${colour};border-radius:3px"></div></div>`;
-  }
-
-  function section(title, content) {
+  function pdfSection(title, content) {
     return `<div style="margin-bottom:28px;page-break-inside:avoid">
-      <div style="font-family:monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#00cc34;border-bottom:1px solid #1e1e1e;padding-bottom:6px;margin-bottom:14px">${e(title)}</div>
+      <div style="font-family:monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6366F1;border-bottom:1px solid #1F2937;padding-bottom:6px;margin-bottom:14px">${e(title)}</div>
       ${content}</div>`;
   }
 
-  function row2(a, b) {
-    return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:10px">${a}${b}</div>`;
-  }
-
-  function kvlist(items) {
-    return items.filter(([,v])=>v!=null&&v!=='').map(([k,v])=>`
-      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #1e1e1e;font-size:12px">
-        <span style="color:#555;font-family:monospace;font-size:10px;text-transform:uppercase">${e(k)}</span>
-        <span style="color:#e8e8e8;text-align:right;max-width:60%">${e(v)}</span>
-      </div>`).join('');
+  function pdfKV(k, v, col) {
+    if (v == null || v === '') return '';
+    return `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #1F2937;font-size:12px">
+      <span style="color:#6B7280;font-family:monospace;font-size:10px;text-transform:uppercase">${e(k)}</span>
+      <span style="color:${col || '#F9FAFB'};text-align:right;max-width:60%">${e(v)}</span>
+    </div>`;
   }
 
   const colors = p02.primary_colors || p02.extracted_colors || [];
-  const colSwatches = colors.slice(0,8).map(c=>`<div style="width:32px;height:32px;border-radius:4px;background:${e(c)};display:inline-block;margin-right:4px;border:1px solid rgba(255,255,255,.1)" title="${e(c)}"></div>`).join('');
+  const colSwatches = colors.slice(0, 8).map(c =>
+    `<div style="width:28px;height:28px;border-radius:4px;background:${e(c)};display:inline-block;margin-right:4px;border:1px solid rgba(255,255,255,.1)" title="${e(c)}"></div>`).join('');
 
-  const compRows = (p04.competitors||[]).slice(0,5).map(c=>`
+  const compRows = (p04.competitors || []).slice(0, 5).map(c => `
     <tr>
-      <td style="font-weight:600;color:#00cc34;font-family:monospace;font-size:11px;padding:7px 8px;border-bottom:1px solid #1e1e1e">${e(c.name||'')}</td>
-      <td style="padding:7px 8px;border-bottom:1px solid #1e1e1e;font-size:11px;color:#999">${e(c.brand_positioning||'—')}</td>
-      <td style="padding:7px 8px;border-bottom:1px solid #1e1e1e;font-size:11px">${e(c.events_activity||'—')}</td>
-      <td style="padding:7px 8px;border-bottom:1px solid #1e1e1e;font-size:11px;color:#555">${e(c.experiential_gap||'—')}</td>
+      <td style="font-weight:600;color:#6366F1;font-family:monospace;font-size:11px;padding:7px 8px;border-bottom:1px solid #1F2937">${e(c.name || '')}</td>
+      <td style="padding:7px 8px;border-bottom:1px solid #1F2937;font-size:11px;color:#9CA3AF">${e(c.brand_positioning || '—')}</td>
+      <td style="padding:7px 8px;border-bottom:1px solid #1F2937;font-size:11px">${e(c.events_activity || '—')}</td>
+      <td style="padding:7px 8px;border-bottom:1px solid #1F2937;font-size:11px;color:#6B7280">${e(c.experiential_gap || '—')}</td>
     </tr>`).join('');
 
-  const eventRows = (p06.events_timeline||[]).slice(0,8).map(ev=>`
-    <div style="padding:10px 12px;background:#0e0e0e;border:1px solid #1e1e1e;border-left:3px solid #008f24;border-radius:4px;margin-bottom:8px;page-break-inside:avoid">
+  const eventCards = (p06.events_timeline || []).slice(0, 8).map(ev => `
+    <div style="padding:10px 12px;background:#111827;border:1px solid #1F2937;border-left:3px solid #6366F1;border-radius:4px;margin-bottom:8px;page-break-inside:avoid">
       <div style="display:flex;justify-content:space-between;margin-bottom:5px">
-        <span style="font-weight:600;font-size:13px">${e(ev.event_name||ev.name||'?')}</span>
-        <span style="font-family:monospace;font-size:10px;color:#555">${e(ev.date||ev.year||'')}</span>
+        <span style="font-weight:600;font-size:13px">${e(ev.event_name || ev.name || '?')}</span>
+        <span style="font-family:monospace;font-size:10px;color:#6B7280">${e(ev.date || ev.year || '')}</span>
       </div>
       <div style="display:flex;gap:5px;flex-wrap:wrap">
-        ${ev.format?`<span style="font-family:monospace;font-size:9px;padding:1px 6px;border:1px solid #00aaff33;color:#00aaff;border-radius:3px">${e(ev.format)}</span>`:''}
-        ${ev.brand_role?`<span style="font-family:monospace;font-size:9px;padding:1px 6px;border:1px solid #00ff4133;color:#00cc34;border-radius:3px">${e(ev.brand_role)}</span>`:''}
-        ${ev.location?`<span style="font-family:monospace;font-size:9px;padding:1px 6px;border:1px solid #2a2a2a;color:#999;border-radius:3px">📍 ${e(ev.location)}</span>`:''}
+        ${ev.format ? `<span style="font-family:monospace;font-size:9px;padding:1px 6px;border:1px solid rgba(59,130,246,.3);color:#3B82F6;border-radius:3px">${e(ev.format)}</span>` : ''}
+        ${ev.brand_role ? `<span style="font-family:monospace;font-size:9px;padding:1px 6px;border:1px solid rgba(16,185,129,.3);color:#10B981;border-radius:3px">${e(ev.brand_role)}</span>` : ''}
+        ${ev.location ? `<span style="font-family:monospace;font-size:9px;padding:1px 6px;border:1px solid #374151;color:#9CA3AF;border-radius:3px">📍 ${e(ev.location)}</span>` : ''}
       </div>
     </div>`).join('');
 
-  const peopleCards = (p09.buying_committee||[]).slice(0,4).map(p=>{
-    const ct = (p10.contacts||[]).find(c=>c.name===p.name) || {};
+  const peopleCards = (p09.buying_committee || []).slice(0, 4).map(p => {
+    const ct = (p10.contacts || []).find(c => c.name === p.name) || {};
     return `
-    <div style="padding:12px;background:#0e0e0e;border:1px solid #1e1e1e;border-radius:6px;margin-bottom:8px;page-break-inside:avoid">
-      <div style="font-weight:700;font-size:14px;margin-bottom:2px">${e(p.name||'—')}</div>
-      <div style="font-family:monospace;font-size:11px;color:#999;margin-bottom:8px">${e(p.title||'—')}</div>
+    <div style="padding:14px;background:#111827;border:1px solid #1F2937;border-radius:8px;margin-bottom:10px;page-break-inside:avoid">
+      <div style="font-weight:700;font-size:14px;margin-bottom:2px">${e(p.name || '—')}</div>
+      <div style="font-size:11px;color:#9CA3AF;margin-bottom:10px">${e(p.title || '—')}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
-        ${p.outreach_priority==='PRIMARY'?`<span style="font-family:monospace;font-size:9px;padding:2px 7px;background:#00ff4114;border:1px solid #00ff4140;color:#00cc34;border-radius:3px">PRIMARY</span>`:''}
-        ${ct.email?`<span style="font-family:monospace;font-size:9px;padding:2px 7px;background:#00aaff10;border:1px solid #00aaff30;color:#00aaff;border-radius:3px">✉ ${e(ct.email)}</span>`:''}
-        ${p.decision_relevance_score?`<span style="font-family:monospace;font-size:9px;padding:2px 7px;border:1px solid #2a2a2a;color:#555;border-radius:3px">Score ${p.decision_relevance_score}/5</span>`:''}
+        ${p.outreach_priority === 'PRIMARY' ? `<span style="font-family:monospace;font-size:9px;padding:2px 7px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25);color:#10B981;border-radius:100px">PRIMARY</span>` : ''}
+        ${ct.email ? `<span style="font-family:monospace;font-size:9px;padding:2px 7px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);color:#3B82F6;border-radius:100px">✉ ${e(ct.email)}</span>` : ''}
+        ${p.decision_relevance_score ? `<span style="font-family:monospace;font-size:9px;padding:2px 7px;border:1px solid #374151;color:#6B7280;border-radius:100px">Score ${p.decision_relevance_score}/5</span>` : ''}
       </div>
-      ${p.personalisation_hook?`<div style="font-size:11px;color:#555;font-style:italic">${e(p.personalisation_hook)}</div>`:''}
+      ${p.personalisation_hook ? `<div style="font-size:11px;color:#6B7280;font-style:italic;margin-top:4px">${e(p.personalisation_hook)}</div>` : ''}
     </div>`;
   }).join('');
 
-  const touchCards = Object.entries(p11.outreach_sequence||{}).map(([key,t])=>{
-    const isLI = (t.channel||'').toLowerCase()==='linkedin';
+  // Build outreach sequences — multi-person
+  let sequences = (p11.contacts_sequences || []).filter(s => s.contact && s.sequence);
+  if (!sequences.length && p11.outreach_sequence) {
+    sequences = [{ contact: p11.primary_contact || {}, sequence: p11.outreach_sequence, personalisation_vars: p11.personalisation_variables_used || {} }];
+  }
+
+  const outreachSections = sequences.slice(0, 4).map((item, idx) => {
+    const c    = item.contact  || {};
+    const seq  = item.sequence || {};
+    const touches = Object.entries(seq)
+      .filter(([, t]) => t && typeof t === 'object')
+      .sort(([a], [b]) => (parseInt(a.replace(/\D/g,''))||0) - (parseInt(b.replace(/\D/g,''))||0));
+
+    const touchCards = touches.map(([key, t]) => {
+      const isLI = (t.channel || '').toLowerCase() === 'linkedin';
+      return `
+      <div style="padding:14px;background:#111827;border:1px solid #1F2937;border-left:3px solid ${isLI ? '#3B82F6' : '#6366F1'};border-radius:4px;margin-bottom:10px;page-break-inside:avoid">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+          <span style="font-family:monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:${isLI ? '#3B82F6' : '#6366F1'}">${e(t.channel || key)}</span>
+          <span style="font-family:monospace;font-size:10px;color:#6B7280">Day ${t.send_day || '—'}</span>
+        </div>
+        ${t.subject_line ? `<div style="font-weight:600;font-size:13px;margin-bottom:8px">📧 ${e(t.subject_line)}</div>` : ''}
+        <div style="font-size:12px;color:#9CA3AF;line-height:1.75;white-space:pre-line">${e(t.message || '—')}</div>
+      </div>`;
+    }).join('');
+
     return `
-    <div style="padding:14px;background:#0e0e0e;border:1px solid #1e1e1e;border-left:3px solid ${isLI?'#00aaff':'#008f24'};border-radius:4px;margin-bottom:10px;page-break-inside:avoid">
-      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
-        <span style="font-family:monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:${isLI?'#00aaff':'#00cc34'}">${e(t.channel||key)}</span>
-        <span style="font-family:monospace;font-size:10px;color:#555">Day ${t.send_day||'—'}</span>
+    <div style="margin-bottom:28px;page-break-before:${idx > 0 ? 'always' : 'avoid'}">
+      <div style="font-family:monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6366F1;border-bottom:1px solid #1F2937;padding-bottom:6px;margin-bottom:14px">
+        Sequence ${idx + 1} of ${sequences.length} — ${e(c.name || 'Unknown')}
       </div>
-      ${t.subject_line?`<div style="font-weight:600;font-size:13px;margin-bottom:8px">📧 ${e(t.subject_line)}</div>`:''}
-      <div style="font-size:12px;color:#999;line-height:1.75;white-space:pre-line">${e(t.message||'—')}</div>
+      <div style="padding:10px 14px;background:#111827;border:1px solid #1F2937;border-radius:6px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;font-size:12px">
+        <span style="font-weight:700">${e(c.name || '—')}</span>
+        ${c.title ? `<span style="color:#9CA3AF">${e(c.title)}</span>` : ''}
+        ${c.email ? `<span style="font-family:monospace;font-size:11px;color:#3B82F6">✉ ${e(c.email)}</span>` : ''}
+        ${c.outreach_priority === 'PRIMARY' ? `<span style="font-family:monospace;font-size:9px;padding:2px 7px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25);color:#10B981;border-radius:100px">PRIMARY</span>` : ''}
+      </div>
+      ${touchCards}
     </div>`;
   }).join('');
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
-<title>BrandScope Report — ${e(data.company_name)}</title>
+<title>BrandScope — ${e(data.company_name)}</title>
 <style>
-  @page { size: A4; margin: 18mm 20mm; }
+  @page { size: A4; margin: 16mm 20mm; }
   * { box-sizing:border-box; margin:0; padding:0; }
-  body { background:#000; color:#e8e8e8; font-family:'Inter',system-ui,sans-serif; font-size:13px; line-height:1.6; }
-  .page-break { page-break-before: always; }
-  @media print {
-    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  }
-</style></head><body style="padding:0">
+  body { background:#0B0F1A; color:#F9FAFB; font-family:'Inter',system-ui,sans-serif; font-size:13px; line-height:1.6; }
+  .pb { page-break-before: always; }
+  @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
+</style></head><body>
 
-<!-- COVER PAGE -->
-<div style="min-height:100vh;display:flex;flex-direction:column;justify-content:space-between;padding:48px 40px;background:#000;border-bottom:2px solid #00ff41">
+<!-- COVER -->
+<div style="min-height:100vh;display:flex;flex-direction:column;justify-content:space-between;padding:48px 40px;background:#0B0F1A">
   <div>
-    <div style="font-family:monospace;font-size:11px;letter-spacing:.2em;color:#00cc34;text-transform:uppercase;margin-bottom:8px">◈ BrandScope · StepOneXP Intelligence</div>
-    <h1 style="font-size:42px;font-weight:700;color:#fff;letter-spacing:-.02em;margin-bottom:6px">${e(data.company_name)}</h1>
-    <div style="font-family:monospace;font-size:13px;color:#555;margin-bottom:32px">${e(data.category||'')}</div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;max-width:600px">
-      <div style="background:#0e0e0e;border:1px solid #1e1e1e;border-radius:6px;padding:14px;text-align:center">
-        ${svgGauge(icp, icpColour, 80)}
-        <div style="font-family:monospace;font-size:9px;letter-spacing:.1em;color:#555;text-transform:uppercase;margin-top:4px">ICP Score</div>
+    <div style="font-family:monospace;font-size:11px;letter-spacing:.2em;color:#6366F1;text-transform:uppercase;margin-bottom:10px">◈ BrandScope Intelligence Report</div>
+    <h1 style="font-size:40px;font-weight:700;color:#F9FAFB;letter-spacing:-.03em;margin-bottom:6px">${e(data.company_name)}</h1>
+    <div style="font-family:monospace;font-size:13px;color:#6B7280;margin-bottom:40px">${e(data.category || '')}</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;max-width:580px">
+      <div style="background:#111827;border:1px solid #1F2937;border-radius:8px;padding:16px;text-align:center">
+        ${svgGauge(icp, icpCol, 80)}
+        <div style="font-family:monospace;font-size:9px;letter-spacing:.1em;color:#6B7280;text-transform:uppercase;margin-top:4px">ICP Score</div>
       </div>
-      <div style="background:#0e0e0e;border:1px solid #1e1e1e;border-radius:6px;padding:14px;text-align:center">
-        <div style="font-size:28px;font-weight:700;font-family:monospace;color:${p08.overall_verdict==='GREEN'?'#00cc34':p08.overall_verdict==='RED'?'#ff3b3b':'#ffaa00'};margin-bottom:4px">${e(p08.overall_verdict||'—')}</div>
-        <div style="font-family:monospace;font-size:9px;letter-spacing:.1em;color:#555;text-transform:uppercase">Watchout</div>
+      <div style="background:#111827;border:1px solid #1F2937;border-radius:8px;padding:16px;text-align:center">
+        <div style="font-size:26px;font-weight:700;font-family:monospace;color:${p08.overall_verdict === 'GREEN' ? '#10B981' : p08.overall_verdict === 'RED' ? '#EF4444' : '#F59E0B'};margin-bottom:4px">${e(p08.overall_verdict || '—')}</div>
+        <div style="font-family:monospace;font-size:9px;letter-spacing:.1em;color:#6B7280;text-transform:uppercase">Watchout</div>
       </div>
-      <div style="background:#0e0e0e;border:1px solid #1e1e1e;border-radius:6px;padding:14px;text-align:center">
-        <div style="font-size:24px;font-weight:700;font-family:monospace;color:#00cc34;margin-bottom:4px">${e(p06.experiential_maturity_score||'—')}<span style="font-size:13px;color:#555">/5</span></div>
-        <div style="font-family:monospace;font-size:9px;letter-spacing:.1em;color:#555;text-transform:uppercase">Events Score</div>
+      <div style="background:#111827;border:1px solid #1F2937;border-radius:8px;padding:16px;text-align:center">
+        <div style="font-size:26px;font-weight:700;font-family:monospace;color:#10B981;margin-bottom:4px">${e(p06.experiential_maturity_score || '—')}<span style="font-size:13px;color:#6B7280">/5</span></div>
+        <div style="font-family:monospace;font-size:9px;letter-spacing:.1em;color:#6B7280;text-transform:uppercase">Events</div>
       </div>
-      <div style="background:#0e0e0e;border:1px solid #1e1e1e;border-radius:6px;padding:14px;text-align:center">
-        <div style="font-size:24px;font-weight:700;font-family:monospace;color:#00cc34;margin-bottom:4px">${p09.total_contacts_found||0}</div>
-        <div style="font-family:monospace;font-size:9px;letter-spacing:.1em;color:#555;text-transform:uppercase">Contacts</div>
+      <div style="background:#111827;border:1px solid #1F2937;border-radius:8px;padding:16px;text-align:center">
+        <div style="font-size:26px;font-weight:700;font-family:monospace;color:#10B981;margin-bottom:4px">${p09.total_contacts_found || (p09.buying_committee || []).length || 0}</div>
+        <div style="font-family:monospace;font-size:9px;letter-spacing:.1em;color:#6B7280;text-transform:uppercase">Contacts</div>
       </div>
     </div>
   </div>
-  <div style="font-family:monospace;font-size:10px;color:#333;letter-spacing:.06em">
-    ${e(data.run_id||'')} · Generated ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})} · Total runtime: ${data.total_elapsed?.toFixed(1)||'?'}s
+  <div style="font-family:monospace;font-size:10px;color:#374151;letter-spacing:.06em">
+    ${e(data.run_id || '')} · Generated ${new Date().toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'})} · ${data.total_elapsed?.toFixed(1) || '?'}s · 12 pipelines
   </div>
 </div>
 
-<!-- PAGE 2: COMPANY + BRAND -->
-<div class="page-break" style="padding:40px">
-
-  ${section('Company Overview', `
+<!-- COMPANY + BRAND -->
+<div class="pb" style="padding:40px">
+  ${pdfSection('Company Overview', `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
-      <div>${kvlist([
-        ['Business Model', p01.business_model],
-        ['Industry', p01.industry_vertical],
-        ['Founded', p01.founding_year],
-        ['Employees', p01.employee_count_range],
-        ['Funding', p01.funding_status],
-        ['Revenue', p01.revenue_range],
-        ['HQ', p01.hq_city ? p01.hq_city+', '+(p01.geography||'') : p01.geography],
-        ['Readiness', p01.experiential_readiness],
-        ['Recommended Service', p01.recommended_service],
-      ])}</div>
       <div>
-        <div style="font-size:12px;color:#999;line-height:1.7;padding:14px;background:#0e0e0e;border-radius:6px;border:1px solid #1e1e1e">${e(p01.company_narrative||'No narrative available.')}</div>
-        ${(p01.key_facts||[]).length ? `<div style="margin-top:10px">${p01.key_facts.slice(0,3).map(f=>`<div style="font-size:11px;padding:5px 8px;background:#0e0e0e;border-left:2px solid #00cc34;margin-bottom:4px;color:#999">${e(f)}</div>`).join('')}</div>` : ''}
+        ${pdfKV('Business Model', p01.business_model)}
+        ${pdfKV('Industry', p01.industry_vertical)}
+        ${pdfKV('Founded', p01.founding_year)}
+        ${pdfKV('Employees', p01.employee_count_range)}
+        ${pdfKV('Funding', p01.funding_status)}
+        ${pdfKV('Revenue', p01.revenue_range)}
+        ${pdfKV('HQ', p01.hq_city ? p01.hq_city + ', ' + (p01.geography || '') : p01.geography)}
+        ${pdfKV('Readiness', p01.experiential_readiness)}
+        ${pdfKV('Service', p01.recommended_service)}
       </div>
-    </div>`
-  )}
+      <div>
+        <div style="font-size:12px;color:#9CA3AF;line-height:1.75;padding:14px;background:#111827;border-radius:6px;border:1px solid #1F2937">${e(p01.company_narrative || 'No narrative.')}</div>
+      </div>
+    </div>
+  `)}
 
-  ${section('Brand Identity', `
+  ${pdfSection('Brand Identity', `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
       <div>
         ${colSwatches ? `<div style="margin-bottom:12px">${colSwatches}</div>` : ''}
-        ${kvlist([
-          ['Primary Font', (p02.primary_fonts||p02.extracted_fonts||[])[0]],
-          ['Brand Tone', p02.brand_tone],
-          ['Visual Style', p02.visual_style],
-          ['Brand Maturity', p02.brand_maturity],
-          ['Tagline', p02.tagline],
-        ])}
+        ${pdfKV('Primary Font', (p02.primary_fonts || p02.extracted_fonts || [])[0])}
+        ${pdfKV('Brand Tone', p02.brand_tone)}
+        ${pdfKV('Visual Style', p02.visual_style)}
+        ${pdfKV('Brand Maturity', p02.brand_maturity)}
+        ${pdfKV('Tagline', p02.tagline)}
       </div>
       <div>
-        ${(p02.brand_voice_keywords||[]).length ? `<div style="margin-bottom:10px"><div style="font-family:monospace;font-size:9px;color:#555;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Voice Keywords</div><div style="display:flex;flex-wrap:wrap;gap:4px">${p02.brand_voice_keywords.map(k=>`<span style="font-family:monospace;font-size:10px;padding:2px 7px;background:#00ff4114;border:1px solid #00ff4140;color:#00cc34;border-radius:3px">${e(k)}</span>`).join('')}</div></div>` : ''}
-        ${p02.experiential_design_angle?`<div style="font-size:12px;color:#999;line-height:1.65;padding:12px;background:#0e0e0e;border:1px solid #1e1e1e;border-radius:6px;margin-top:8px">🎨 ${e(p02.experiential_design_angle)}</div>`:''}
+        ${(p02.brand_voice_keywords || []).length ? `<div style="margin-bottom:10px"><div style="font-family:monospace;font-size:9px;color:#6B7280;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Voice Keywords</div><div style="display:flex;flex-wrap:wrap;gap:4px">${p02.brand_voice_keywords.map(k => `<span style="font-family:monospace;font-size:10px;padding:2px 7px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);color:#6366F1;border-radius:100px">${e(k)}</span>`).join('')}</div></div>` : ''}
+        ${p02.experiential_design_angle ? `<div style="font-size:12px;color:#9CA3AF;line-height:1.65;padding:12px;background:#111827;border:1px solid #1F2937;border-radius:6px;margin-top:8px">🎨 ${e(p02.experiential_design_angle)}</div>` : ''}
       </div>
-    </div>`
-  )}
-</div>
-
-<!-- PAGE 3: MARKET + COMPETITORS -->
-<div class="page-break" style="padding:40px">
-
-  ${section('Market Position & Reputation', `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
-      <div>
-        <div style="font-family:monospace;font-size:9px;color:#555;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Market Position</div>
-        ${kvlist([
-          ['Share of Voice', p03.share_of_voice_level],
-          ['Sentiment', p03.brand_sentiment],
-          ['Perception Gap', p03.perception_gap_score ? p03.perception_gap_score+'/5' : null],
-          ['Sentiment Shift', p03.recent_sentiment_shift],
-        ])}
-        ${p03.market_position_summary?`<div style="margin-top:10px;font-size:11px;color:#555;line-height:1.65">${e(p03.market_position_summary)}</div>`:''}
-      </div>
-      <div>
-        <div style="font-family:monospace;font-size:9px;color:#555;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Reputation</div>
-        ${kvlist([
-          ['Score', p07.overall_reputation_score ? p07.overall_reputation_score+'/100' : null],
-          ['Label', p07.reputation_label],
-          ['NPS Signal', p07.nps_signal],
-          ['Community', p07.brand_community_strength],
-          ['Reddit', p07.reddit_sentiment],
-        ])}
-        ${p07.reputation_opportunity?`<div style="margin-top:10px;font-size:11px;color:#00cc34;padding:8px 10px;background:#00ff4110;border:1px solid #00ff4130;border-radius:4px">🎯 ${e(p07.reputation_opportunity)}</div>`:''}
-      </div>
-    </div>`
-  )}
-
-  ${section('Competitor Mapping', `
-    ${compRows ? `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
-      <thead><tr>
-        <th style="font-family:monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#555;padding:6px 8px;text-align:left;border-bottom:1px solid #1e1e1e">Brand</th>
-        <th style="font-family:monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#555;padding:6px 8px;text-align:left;border-bottom:1px solid #1e1e1e">Positioning</th>
-        <th style="font-family:monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#555;padding:6px 8px;text-align:left;border-bottom:1px solid #1e1e1e">Events</th>
-        <th style="font-family:monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#555;padding:6px 8px;text-align:left;border-bottom:1px solid #1e1e1e">Their Gap</th>
-      </tr></thead>
-      <tbody>${compRows}</tbody>
-    </table></div>` : '<div style="color:#555;font-family:monospace;font-size:12px">No competitor data</div>'}
-    ${p04.experiential_white_space?`<div style="margin-top:12px;font-size:12px;color:#00cc34;padding:10px 12px;background:#00ff4110;border:1px solid #00ff4130;border-radius:4px">🎯 White space: ${e(p04.experiential_white_space)}</div>`:''}
+    </div>
   `)}
 </div>
 
-<!-- PAGE 4: EVENTS -->
-<div class="page-break" style="padding:40px">
-  ${section('Experiential Footprint', `
-    <div style="display:grid;grid-template-columns:160px 1fr;gap:24px;margin-bottom:20px">
-      <div style="text-align:center;padding:16px;background:#0e0e0e;border:1px solid #1e1e1e;border-radius:6px">
-        <div style="font-size:42px;font-weight:700;font-family:monospace;color:#00cc34">${p06.experiential_maturity_score||'?'}</div>
-        <div style="font-size:10px;font-family:monospace;color:#555;text-transform:uppercase;letter-spacing:.1em">/5 Maturity</div>
-        ${hBar((p06.experiential_maturity_score||0),5,'#00cc34')}
+<!-- MARKET + COMPETITORS -->
+<div class="pb" style="padding:40px">
+  ${pdfSection('Market Position & Reputation', `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+      <div>
+        <div style="font-family:monospace;font-size:9px;color:#6B7280;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Market Position</div>
+        ${pdfKV('Share of Voice', p03.share_of_voice_level)}
+        ${pdfKV('Sentiment', p03.brand_sentiment)}
+        ${pdfKV('Perception Gap', p03.perception_gap_score ? p03.perception_gap_score + '/5' : null)}
+        ${p03.market_position_summary ? `<div style="margin-top:10px;font-size:11px;color:#6B7280;line-height:1.65">${e(p03.market_position_summary)}</div>` : ''}
       </div>
       <div>
-        ${kvlist([
-          ['Events Found', (p06.events_timeline||[]).length],
-          ['Frequency', p06.events_frequency],
-          ['Last Event', p06.last_event_months_ago!=null ? p06.last_event_months_ago+' months ago' : null],
-          ['Geography', (p06.geography_of_events||[]).join(' · ')||null],
-        ])}
-        ${p06.pitch_angle?`<div style="margin-top:10px;font-size:12px;color:#00cc34;padding:8px 10px;background:#00ff4110;border:1px solid #00ff4130;border-radius:4px">🎯 ${e(p06.pitch_angle)}</div>`:''}
+        <div style="font-family:monospace;font-size:9px;color:#6B7280;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Reputation</div>
+        ${pdfKV('Score', p07.overall_reputation_score ? p07.overall_reputation_score + '/100' : null)}
+        ${pdfKV('Label', p07.reputation_label)}
+        ${pdfKV('NPS Signal', p07.nps_signal)}
+        ${pdfKV('Community', p07.brand_community_strength)}
+        ${p07.reputation_opportunity ? `<div style="margin-top:10px;font-size:11px;color:#10B981;padding:8px 10px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25);border-radius:4px">🎯 ${e(p07.reputation_opportunity)}</div>` : ''}
       </div>
     </div>
-    ${eventRows || '<div style="color:#555;font-family:monospace;font-size:12px;padding:16px 0">No confirmed events found in research data</div>'}
-    ${(p06.formats_missing||[]).length?`<div style="margin-top:12px;padding:10px 12px;background:#ffaa0010;border:1px solid #ffaa0030;border-radius:4px;font-size:11px;color:#ffaa00">📌 Missing formats: ${e(p06.formats_missing.join(' · '))}</div>`:''}`
-  )}
+  `)}
+
+  ${pdfSection('Competitor Mapping', `
+    ${compRows ? `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
+      <thead><tr>
+        <th style="font-family:monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#6B7280;padding:6px 8px;text-align:left;border-bottom:1px solid #1F2937">Brand</th>
+        <th style="font-family:monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#6B7280;padding:6px 8px;text-align:left;border-bottom:1px solid #1F2937">Positioning</th>
+        <th style="font-family:monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#6B7280;padding:6px 8px;text-align:left;border-bottom:1px solid #1F2937">Events</th>
+        <th style="font-family:monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#6B7280;padding:6px 8px;text-align:left;border-bottom:1px solid #1F2937">Their Gap</th>
+      </tr></thead>
+      <tbody>${compRows}</tbody></table></div>` : '<div style="color:#6B7280;font-family:monospace;font-size:12px">No competitor data</div>'}
+    ${p04.experiential_white_space ? `<div style="margin-top:12px;font-size:12px;color:#6366F1;padding:10px 12px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:4px">🎯 White space: ${e(p04.experiential_white_space)}</div>` : ''}
+  `)}
 </div>
 
-<!-- PAGE 5: PEOPLE + OUTREACH -->
-<div class="page-break" style="padding:40px">
-
-  ${section('Decision Makers & Contact Intelligence', `
-    ${peopleCards || '<div style="color:#555;font-family:monospace;font-size:12px">No decision makers found</div>'}
-    ${p10.email_pattern?`<div style="margin-top:12px;padding:10px 12px;background:#0e0e0e;border:1px solid #1e1e1e;border-radius:4px;font-family:monospace;font-size:11px;color:#555">Email pattern: <span style="color:#00cc34">${e(p10.email_pattern)}@${e(p10.domain||'?')}</span> · ${p10.verified_emails||0} verified · ${p10.inferred_emails||0} inferred</div>`:''}`
-  )}
-
-  ${section('4-Touch Outreach Sequence', `
-    ${p11.primary_contact?.name ? `<div style="padding:10px 14px;background:#0e0e0e;border:1px solid #1e1e1e;border-radius:6px;margin-bottom:14px;font-size:13px;display:flex;flex-wrap:wrap;gap:12px;align-items:center">
-      <span style="font-weight:700">${e(p11.primary_contact.name)}</span>
-      ${p11.primary_contact.title?`<span style="color:#555">${e(p11.primary_contact.title)}</span>`:''}
-      ${p11.primary_contact.email?`<span style="font-family:monospace;font-size:11px;color:#00aaff">✉ ${e(p11.primary_contact.email)}</span>`:''}
-    </div>` : ''}
-    ${touchCards}`
-  )}
+<!-- EVENTS -->
+<div class="pb" style="padding:40px">
+  ${pdfSection('Experiential Footprint', `
+    <div style="display:grid;grid-template-columns:160px 1fr;gap:24px;margin-bottom:20px">
+      <div style="text-align:center;padding:16px;background:#111827;border:1px solid #1F2937;border-radius:8px">
+        <div style="font-size:40px;font-weight:700;font-family:monospace;color:#10B981">${p06.experiential_maturity_score || '?'}</div>
+        <div style="font-size:10px;font-family:monospace;color:#6B7280;text-transform:uppercase;letter-spacing:.1em">/5 Maturity</div>
+      </div>
+      <div>
+        ${pdfKV('Events Found', (p06.events_timeline || []).length || null)}
+        ${pdfKV('Frequency', p06.events_frequency)}
+        ${pdfKV('Last Event', p06.last_event_months_ago != null ? p06.last_event_months_ago + ' months ago' : null)}
+        ${pdfKV('Geography', (p06.geography_of_events || []).join(' · ') || null)}
+        ${p06.pitch_angle ? `<div style="margin-top:10px;font-size:12px;color:#6366F1;padding:8px 10px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:4px">🎯 ${e(p06.pitch_angle)}</div>` : ''}
+      </div>
+    </div>
+    ${eventCards || '<div style="color:#6B7280;font-family:monospace;font-size:12px;padding:16px 0">No confirmed events found</div>'}
+    ${(p06.formats_missing || []).length ? `<div style="margin-top:12px;padding:10px 12px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:4px;font-size:11px;color:#F59E0B">📌 Missing formats: ${e(p06.formats_missing.join(' · '))}</div>` : ''}
+  `)}
 </div>
 
-<!-- PAGE 6: STRATEGIC NOTES -->
-<div class="page-break" style="padding:40px">
-  ${section('Strategic Watchouts & Timing', `
+<!-- DECISION MAKERS -->
+<div class="pb" style="padding:40px">
+  ${pdfSection('Decision Makers & Contact Intelligence', `
+    ${peopleCards || '<div style="color:#6B7280;font-family:monospace;font-size:12px">No decision makers found</div>'}
+    ${p10.email_pattern ? `<div style="margin-top:12px;padding:10px 12px;background:#111827;border:1px solid #1F2937;border-radius:4px;font-family:monospace;font-size:11px;color:#6B7280">Email pattern: <span style="color:#6366F1">${e(p10.email_pattern)}@${e(p10.domain || '?')}</span> · ${p10.verified_emails || 0} verified · ${p10.inferred_emails || 0} inferred</div>` : ''}
+  `)}
+
+  ${pdfSection('Strategic Watchouts', `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
       <div>
-        ${kvlist([
-          ['Verdict', p08.overall_verdict],
-          ['Timing', p08.timing_recommendation],
-          ['Tone Adjustment', p08.pitch_tone_adjustment],
-          ['Marketing Freeze', p08.marketing_freeze_detected?'Yes':'No'],
-        ])}
-        ${p08.verdict_reasoning?`<div style="margin-top:12px;font-size:12px;color:#999;line-height:1.65">${e(p08.verdict_reasoning)}</div>`:''}
+        ${pdfKV('Verdict', p08.overall_verdict, p08.overall_verdict === 'GREEN' ? '#10B981' : p08.overall_verdict === 'RED' ? '#EF4444' : '#F59E0B')}
+        ${pdfKV('Timing', p08.timing_recommendation)}
+        ${pdfKV('Tone', p08.pitch_tone_adjustment)}
+        ${p08.verdict_reasoning ? `<div style="margin-top:10px;font-size:11px;color:#9CA3AF;line-height:1.65">${e(p08.verdict_reasoning)}</div>` : ''}
       </div>
       <div>
-        ${(p08.financial_distress_signals||[]).length?`<div style="margin-bottom:12px"><div style="font-family:monospace;font-size:9px;color:#ff3b3b;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Financial Signals</div>${p08.financial_distress_signals.slice(0,2).map(s=>`<div style="font-size:11px;color:#999;padding:5px 8px;border-left:2px solid #ff3b3b;margin-bottom:4px">${e(s)}</div>`).join('')}</div>`:''}
-        ${(p08.leadership_changes||[]).length?`<div><div style="font-family:monospace;font-size:9px;color:#00cc34;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Leadership Changes</div>${p08.leadership_changes.map(lc=>`<div style="font-size:11px;color:#999;padding:5px 8px;border-left:2px solid #00cc34;margin-bottom:4px"><span style="color:#00cc34">${e(lc.role)}</span>: ${e(lc.change)} — ${e(lc.implication||'')}</div>`).join('')}</div>`:''}
+        ${(p08.financial_distress_signals || []).length ? `<div style="margin-bottom:12px">${p08.financial_distress_signals.slice(0, 2).map(s => `<div style="font-size:11px;color:#9CA3AF;padding:5px 8px;border-left:2px solid #EF4444;margin-bottom:4px">${e(s)}</div>`).join('')}</div>` : ''}
+        ${(p08.leadership_changes || []).length ? p08.leadership_changes.map(lc => `<div style="font-size:11px;color:#9CA3AF;padding:5px 8px;border-left:2px solid #10B981;margin-bottom:4px"><span style="color:#10B981">${e(lc.role)}</span>: ${e(lc.change)}</div>`).join('') : ''}
       </div>
-    </div>`
-  )}
+    </div>
+  `)}
+</div>
 
-  ${section('Brand Activity (Last 24 Months)', `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
-      <div>${kvlist([
-        ['Content Cadence', p05.social_content_cadence],
-        ['PR Activity', p05.pr_activity_level],
-        ['Budget Signal', p05.budget_signal],
-        ['Seasonal Pattern', p05.seasonal_pattern],
-        ['Last Campaign', p05.last_major_campaign],
-        ['Next Window', p05.upcoming_opportunity_window],
-      ])}</div>
-      <div>${(p05.recent_campaigns||[]).slice(0,3).map(c=>`<div style="font-size:11px;padding:7px 10px;background:#0e0e0e;border-radius:4px;margin-bottom:5px"><span style="color:#00cc34;font-weight:600">${e(c.name||'?')}</span> <span style="color:#555">${e(c.date||'')} · ${e(c.channel||'')}</span>${c.description?`<div style="color:#555;margin-top:3px;font-size:10px">${e(c.description)}</div>`:''}</div>`).join('')}</div>
-    </div>`
-  )}
+<!-- OUTREACH SEQUENCES -->
+${outreachSections ? `<div class="pb" style="padding:40px">
+  <div style="font-family:monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6366F1;border-bottom:1px solid #1F2937;padding-bottom:6px;margin-bottom:20px">4-Touch Outreach Sequences — ${sequences.length} Contact${sequences.length !== 1 ? 's' : ''}</div>
+  ${outreachSections}
+</div>` : ''}
 
-  <!-- Footer -->
-  <div style="margin-top:40px;padding-top:20px;border-top:1px solid #1e1e1e;font-family:monospace;font-size:10px;color:#333;display:flex;justify-content:space-between">
-    <span>BrandScope by StepOneXP · Automated Brand Intelligence</span>
-    <span>${e(data.run_id||'')} · ${data.total_elapsed?.toFixed(1)||'?'}s · 12 pipelines</span>
-  </div>
+<!-- FOOTER -->
+<div style="padding:24px 40px;border-top:1px solid #1F2937;font-family:monospace;font-size:10px;color:#374151;display:flex;justify-content:space-between">
+  <span>BrandScope · Brand Intelligence System</span>
+  <span>${e(data.run_id || '')} · ${data.total_elapsed?.toFixed(1) || '?'}s · 12 pipelines</span>
 </div>
 
 </body></html>`;
 }
 
-/* ══════════════════════════════════════════════════
+/* ════════════════════════════════════════════════════════
    REPORTS
-══════════════════════════════════════════════════ */
+════════════════════════════════════════════════════════ */
 async function loadReports() {
   const grid = $('reportsGrid');
-  grid.textContent = 'Loading...';
+  if (!grid) return;
+  grid.innerHTML = '<div class="reports-loading">Loading…</div>';
   try {
     const res  = await fetch(`${API}/reports`);
     const data = await res.json();
     if (!data.reports?.length) {
-      grid.innerHTML = '<div style="color:var(--text3);grid-column:1/-1;font-family:var(--mono);font-size:12px">No past reports found.</div>';
+      grid.innerHTML = '<div class="reports-loading">No past reports found.</div>';
       return;
     }
     grid.innerHTML = data.reports.map(r => `
-      <div class="report-card" onclick="loadReport('${esc(r.run_id||'')}').then(()=>showSection('results'))">
-        <div class="report-company">${esc(r.company||r.run_id||'—')}</div>
+      <div class="report-card" onclick="loadReport('${esc(r.run_id || '')}').then(()=>showSection('results'))">
+        <div class="report-company">${esc(r.company || r.run_id || '—')}</div>
         <div class="report-meta">
-          <span>${esc(r.run_id||'')}</span>
+          ${r.run_id ? `<span>${esc(r.run_id)}</span>` : ''}
           ${r.elapsed ? `<span>${r.elapsed.toFixed(1)}s · 12 pipelines</span>` : ''}
-          <span>${r.completed_at ? new Date(r.completed_at).toLocaleDateString() : ''}</span>
+          ${r.completed_at ? `<span>${new Date(r.completed_at).toLocaleDateString()}</span>` : ''}
         </div>
-        <div class="report-status"><span class="badge ${r.status==='success'?'bg':r.status==='partial'?'ba':'br'}">${esc(r.status||'?')}</span></div>
+        <div class="report-status">${badge(r.status || '?', r.status === 'success' ? 'green' : r.status === 'partial' ? 'amber' : 'red')}</div>
       </div>`).join('');
   } catch {
     grid.innerHTML = '<div style="color:var(--red);font-family:var(--mono);font-size:12px">Could not load reports — is the API running?</div>';
