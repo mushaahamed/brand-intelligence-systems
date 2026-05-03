@@ -487,12 +487,13 @@ Inline <style> block colors are real — modern sites (Shopify, Next.js) embed C
 IGNORE any colors that look like payment gateways (Razorpay, Paytm), social media icons, or chat widgets.
 Pick 2-4 colors that form a coherent, intentional brand palette."""
 
-        result_str = synthesise(system_prompt, user_data, max_tokens=1000)
+        # Use GPT-4o (not mini) — it has real brand knowledge to validate extracted colors
+        from config.settings import OPENAI_MODEL_FULL
+        result_str = synthesise(system_prompt, user_data, model=OPENAI_MODEL_FULL, max_tokens=1000)
 
         if result_str:
             output = safe_json_parse(result_str)
             if output:
-                # Ensure primary_colors is always populated
                 if not output.get("primary_colors"):
                     best = (structured.get("colors_logo") or
                             structured["colors_meta"] or
@@ -502,9 +503,11 @@ Pick 2-4 colors that form a coherent, intentional brand palette."""
                             structured["extracted_colors"])
                     output["primary_colors"]  = best[:3]
                     output["secondary_colors"] = best[3:6]
+                log.info("p02_done", colors=output.get("primary_colors"),
+                         tone=output.get("brand_tone"))
                 return output
 
-        # Hard fallback
+        # Hard fallback — GPT call failed entirely
         best = (structured.get("colors_logo") or
                 structured["colors_meta"] or
                 structured["colors_css_vars"] or
