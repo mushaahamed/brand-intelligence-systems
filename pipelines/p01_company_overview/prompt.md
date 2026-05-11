@@ -20,7 +20,6 @@ Return a JSON object matching this exact structure:
   "revenue_range": "$10-50M",
   "marketing_maturity_score": 4,
   "website_quality_score": 4,
-  "icp_fit_score": 85,
   "experiential_readiness": "HIGH",
   "recommended_service": "Consumer activations",
   "company_narrative": "One paragraph, max 100 words, specific to this company",
@@ -37,12 +36,10 @@ Return a JSON object matching this exact structure:
 - 4: Active campaigns, press coverage, clear brand identity
 - 5: Multi-channel campaigns, PR machine, brand events
 
-### ICP Fit Score (0-100)
-- B2C brand: +25 points
-- 200+ employees: +25 points
-- VC-backed or public: +25 points
-- India presence: +25 points
-- Deduct 10 if no marketing activity visible
+### Experiential Readiness (HIGH / MEDIUM / LOW)
+- HIGH: B2C or B2B2C, 200+ employees, active marketing, funded or public, India presence
+- MEDIUM: B2B or early-stage B2C, some marketing activity, growing team
+- LOW: Pre-revenue, no marketing activity, or clearly not a fit for experiential
 
 ## Rules
 - Return ONLY valid JSON

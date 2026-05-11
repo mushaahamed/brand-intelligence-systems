@@ -325,13 +325,6 @@ function renderReport(data) {
   const elapsed = data.total_elapsed ? ` · ${data.total_elapsed.toFixed(1)}s` : '';
   $('rhMeta').textContent = `${data.run_id || ''} · ${data.category || ''}${elapsed}`;
 
-  const icp = p01.icp_fit_score ?? 0;
-  const icpColor = icp >= 70 ? 'var(--green)' : icp >= 40 ? 'var(--amber)' : 'var(--red)';
-  $('rhScore').textContent = icp || '—';
-  $('rhScore').style.color = icpColor;
-  $('rhScoreBar').style.width = `${icp}%`;
-  $('rhScoreBar').style.background = icpColor;
-
   const v  = p08.overall_verdict || '';
   const vEl = $('rhVerdict');
   if (v && vEl) {
@@ -340,7 +333,6 @@ function renderReport(data) {
   }
 
   /* ── All cards ── */
-  renderIcpCard(p01, p06);
   renderCompanyCard(p01);
   renderWatchoutsCard(p08);
   renderReputationCard(p07);
@@ -408,8 +400,12 @@ function renderIcpCard(d, p06) {
 
 /* Company Overview */
 function renderCompanyCard(d) {
+  const readiness = d.experiential_readiness || '';
+  const readCls   = verdictCls(readiness) === 'g' ? 'green' : verdictCls(readiness) === 'r' ? 'red' : 'amber';
   $('card-company').innerHTML = `
-    <div class="card-head"><span class="card-title">Company Overview</span></div>
+    <div class="card-head"><span class="card-title">Company Overview</span>
+      ${readiness ? `<span class="badge ${readCls}">${esc(readiness)} Readiness</span>` : ''}
+    </div>
     <div class="card-body">
       ${kv('Business Model', d.business_model)}
       ${kv('Industry', d.industry_vertical)}
@@ -418,6 +414,7 @@ function renderCompanyCard(d) {
       ${kv('Funding', d.funding_status || d.funding_stage)}
       ${kv('Revenue', d.revenue_range)}
       ${kv('HQ', d.hq_city ? `${d.hq_city}, ${d.geography || ''}` : d.geography)}
+      ${d.recommended_service ? `<div class="insight" style="margin-top:10px">🎯 ${esc(d.recommended_service)}</div>` : ''}
       ${d.company_narrative ? `<div class="card-note">${esc(d.company_narrative)}</div>` : ''}
     </div>`;
 }

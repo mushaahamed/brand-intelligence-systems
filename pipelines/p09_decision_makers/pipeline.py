@@ -80,8 +80,10 @@ Your task: Use your training knowledge to identify the marketing decision-makers
 Key rules:
 - For product brands (Dove, Gillette, Ariel, Maggi, Horlicks, etc.) → identify people at the PARENT COMPANY (HUL, P&G India, Nestlé India) who manage that category/brand
 - For standalone companies (Mamaearth, Razorpay, Zomato, etc.) → identify their direct marketing leadership
-- Use real names from your training data. For people you're less certain about, provide plausible names based on the org structure — mark confidence_level as MEDIUM or LOW
-- NEVER return an empty buying_committee. Always give at least 2 people even if inferring from typical org structures
+- ONLY include people you genuinely know from your training data — real names, real titles, real companies
+- If you do not have real knowledge of specific individuals at this company, return an empty buying_committee — DO NOT guess or invent names
+- An empty list is correct and honest for small, private, or less publicly visible companies
+- NEVER fabricate names. Wrong names are worse than no names.
 
 Return ONLY valid JSON, no markdown:
 {
@@ -98,7 +100,7 @@ Return ONLY valid JSON, no markdown:
       "personalisation_hook": "A specific fact about this person or their brand work"
     }
   ],
-  "primary_contact": "Name of best person to contact first",
+  "primary_contact": "Name of best person to contact first or null",
   "parent_company": "Parent company if product brand, else null",
   "confidence_level": "HIGH | MEDIUM | LOW",
   "data_source": "gpt_knowledge",
@@ -294,14 +296,7 @@ Extract people from these search results only. Do not invent anyone not found in
         # ── Merge both sources ────────────────────────────────────────────────
         merged = _merge_committees(search_people, knowledge_people, li_map)
 
-        if not merged:
-            # Absolute last resort — re-ask with explicit "use knowledge" instruction
-            fallback_raw    = synthesise(KNOWLEDGE_SYSTEM_PROMPT,
-                                         f"COMPANY: {n}\nCATEGORY: {category}\n"
-                                         f"I need at least 2-3 marketing contacts. Use your best inference.",
-                                         model=OPENAI_MODEL_FULL, max_tokens=1000)
-            fallback_parsed = safe_json_parse(fallback_raw or "") or {}
-            merged          = fallback_parsed.get("buying_committee", [])
+        # Do NOT add a fallback that invents names — empty is better than wrong
 
         # Determine primary contact (highest decision_relevance_score among PRIMARY)
         primary = next(
