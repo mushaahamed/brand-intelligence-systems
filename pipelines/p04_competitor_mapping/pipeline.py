@@ -76,11 +76,11 @@ class CompetitorMappingPipeline(BasePipeline):
             f"{n} vs {self.category} brands comparison India",
         ]
         raw["competitor_search"] = run_google_searches_parallel(queries, PIPELINE_ID, num_results=10)
-        log.info("p04_search_done", results=len(raw["competitor_search"]))
+        log.info("     Competitor landscape searched")
 
         comp_names = self._identify_competitors(raw["competitor_search"])
-        log.info("p04_competitors", count=len(comp_names),
-                 names=[c.get("name") for c in comp_names])
+        if comp_names:
+            log.info(f"     Identified: {', '.join(c.get('name','') for c in comp_names)}")
 
         for comp in comp_names[:2]:
             website = comp.get("website")
@@ -90,8 +90,8 @@ class CompetitorMappingPipeline(BasePipeline):
                     raw["competitor_pages"][comp["name"]] = {
                         "pages": pages, "reason": comp.get("reason", "")
                     }
-                except Exception as e:
-                    log.warning("p04_crawl_failed", name=comp.get("name"), error=str(e))
+                except Exception:
+                    pass
 
         raw["identified_competitors"] = comp_names
         return raw
@@ -188,9 +188,9 @@ Update the analysis with any new positioning copy or evidence from the website c
             if enriched_out and enriched_out.get("competitors"):
                 result = enriched_out
 
-        log.info("p04_done",
-                 competitors=len((result or {}).get("competitors", [])),
-                 urgency=(result or {}).get("competitive_urgency"))
+        comp_count = len((result or {}).get("competitors", []))
+        urgency    = (result or {}).get("competitive_urgency", "")
+        log.info(f"     {comp_count} competitors mapped · Competitive urgency: {urgency}")
 
         return result or {
             "competitors":             [],

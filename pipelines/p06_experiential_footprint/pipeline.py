@@ -73,7 +73,7 @@ class ExperientialFootprintPipeline(BasePipeline):
             f"{n} campaign award sponsor partner CSR experience marketing",
         ]
         results = run_google_searches_parallel(queries, PIPELINE_ID, num_results=10)
-        log.info("p06_search_results", count=len(results))
+        log.info("     Events and activations searched")
         return {"event_search": results}
 
     def extract(self, raw: dict) -> dict:
@@ -107,8 +107,6 @@ class ExperientialFootprintPipeline(BasePipeline):
 
         # If strict filter found nothing, use ALL results (let LLM decide)
         signals_to_use = event_signals if event_signals else all_signals
-
-        log.info("p06_signals", broad_matches=len(event_signals), total=len(all_signals))
 
         return {
             "company_name":  self.company_name,
@@ -163,8 +161,6 @@ A score of 1 means they have NEVER done any event in their entire existence — 
                     parsed["experiential_maturity_score"] = 1 if not parsed["events_timeline"] else 2
                 return parsed
 
-        # Rich fallback — never return empty
-        log.warning("p06_synthesis_fallback", company=structured["company_name"])
         return {
             "events_timeline": [],
             "experiential_maturity_score": 1,

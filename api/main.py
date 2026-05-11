@@ -20,6 +20,20 @@ from fastapi.responses import FileResponse, JSONResponse
 from api.models import AnalyseRequest, TrackEventRequest
 from config.settings import validate_config, API_HOST, API_PORT, OUTPUT_DIR
 
+# ── Clean terminal output for demos ──────────────────────────────────────────
+structlog.configure(
+    processors=[
+        structlog.processors.TimeStamper(fmt="%H:%M:%S", utc=False),
+        structlog.dev.ConsoleRenderer(
+            colors=True,
+            exception_formatter=structlog.dev.plain_traceback,
+        ),
+    ],
+    wrapper_class=structlog.BoundLogger,
+    context_class=dict,
+    logger_factory=structlog.PrintLoggerFactory(),
+)
+
 log = structlog.get_logger()
 
 app = FastAPI(
@@ -151,6 +165,9 @@ def _run_analysis_job(job_id: str, name: str, url: str, category: str):
 
     try:
         from orchestrator import run_full_analysis, get_summary
+        log.info(f"\n{'─'*60}")
+        log.info(f"  Brand Intelligence Analysis  ·  {name}  ·  {category}")
+        log.info(f"{'─'*60}")
         result  = run_full_analysis(name, url, category,
                                     progress_cb=_progress,
                                     running_cb=_running,
@@ -163,10 +180,14 @@ def _run_analysis_job(job_id: str, name: str, url: str, category: str):
         _jobs[job_id]["result"]         = summary
         _jobs[job_id]["run_id"]         = result["run_id"]
         _jobs[job_id]["elapsed"]        = result.get("total_elapsed")
+        elapsed_total = result.get("total_elapsed", 0)
+        log.info(f"{'─'*60}")
+        log.info(f"  ✅  Analysis complete  ·  {name}  ·  {elapsed_total}s  ·  12 pipelines")
+        log.info(f"{'─'*60}\n")
 
     except Exception as e:
         import traceback
-        log.error("job_failed", job_id=job_id, error=str(e))
+        log.error(f"  ✗  Analysis failed — {str(e)[:120]}")
         _jobs[job_id]["status"]    = "failed"
         _jobs[job_id]["error"]     = str(e)
         _jobs[job_id]["traceback"] = traceback.format_exc()

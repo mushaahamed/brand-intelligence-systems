@@ -321,10 +321,8 @@ def _extract_logo_colors(logo_url: str) -> list[str]:
             h = _norm_hex(h)
             if h and not _is_boring(h) and h not in THIRD_PARTY_COLORS:
                 colors.append(h)
-        log.info("p02_logo_colors", logo=logo_url[-50:], colors=colors)
         return colors[:5]
-    except Exception as e:
-        log.warning("p02_logo_color_failed", error=str(e))
+    except Exception:
         return []
 
 
@@ -357,7 +355,7 @@ class BrandIdentityPipeline(BasePipeline):
         raw = {"pages": [], "css_texts": [], "html_raw": "", "final_url": url,
                "logo_url": None, "logo_colors": []}
 
-        log.info("p02_fetch_website", url=url)
+        log.info(f"     Fetching website assets for {self.company_name}...")
         raw["pages"] = fast_crawl(url, max_pages=3)
 
         try:
@@ -367,21 +365,25 @@ class BrandIdentityPipeline(BasePipeline):
             raw["final_url"] = resp.url
 
             # Linked CSS files
+            css_count = 0
             for css_url in _extract_css_assets(html, resp.url):
                 css_text = _fetch_css(css_url)
                 if css_text:
                     raw["css_texts"].append(css_text)
-                    log.info("p02_css_fetched", url=css_url, chars=len(css_text))
+                    css_count += 1
+            if css_count:
+                log.info(f"     {css_count} CSS stylesheet(s) fetched — analysing design tokens")
 
             # Logo image colors
             logo_url = _find_logo_url(html, resp.url)
             if logo_url:
                 raw["logo_url"]    = logo_url
                 raw["logo_colors"] = _extract_logo_colors(logo_url)
-                log.info("p02_logo_found", logo=logo_url[-60:], colors=raw["logo_colors"])
+                if raw["logo_colors"]:
+                    log.info(f"     Brand logo identified — {len(raw['logo_colors'])} dominant colors extracted")
 
-        except Exception as e:
-            log.warning("p02_html_fetch_failed", error=str(e))
+        except Exception:
+            pass
 
         return raw
 
@@ -417,14 +419,7 @@ class BrandIdentityPipeline(BasePipeline):
             "\n".join(STYLE_BLOCK_RE.findall(html))) or _parse_fonts(html)
         copy  = _extract_homepage_copy(raw.get("pages", []))
 
-        log.info("p02_colors_extracted",
-                 logo=len(logo_colors),
-                 meta=1 if meta_color else 0,
-                 inline=len(inline_colors),
-                 css_vars=len(css_var_colors),
-                 semantic=len(semantic_colors),
-                 general=len(general_colors),
-                 merged_total=len(merged))
+        log.info(f"     Brand palette extracted — {len(merged)} colors identified across {len([x for x in [logo_colors, [meta_color] if meta_color else [], css_var_colors, inline_colors] if x])} signal sources")
 
         return {
             "company_name":       self.company_name,
@@ -503,8 +498,7 @@ Pick 2-4 colors that form a coherent, intentional brand palette."""
                             structured["extracted_colors"])
                     output["primary_colors"]  = best[:3]
                     output["secondary_colors"] = best[3:6]
-                log.info("p02_done", colors=output.get("primary_colors"),
-                         tone=output.get("brand_tone"))
+                log.info(f"     Tone: {output.get('brand_tone')} · Primary: {output.get('primary_colors')}")
                 return output
 
         # Hard fallback — GPT call failed entirely

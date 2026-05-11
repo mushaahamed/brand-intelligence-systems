@@ -1006,282 +1006,421 @@ function buildPDFHTML(data) {
 
   const e   = esc;
   const icp = p01.icp_fit_score || 0;
-  const icpCol = icp >= 70 ? '#10B981' : icp >= 40 ? '#F59E0B' : '#EF4444';
+  const icpCol = icp >= 70 ? '#059669' : icp >= 40 ? '#D97706' : '#DC2626';
+  const verdictCol = v => v === 'GREEN' ? '#059669' : v === 'RED' ? '#DC2626' : '#D97706';
 
-  function svgGauge(pct, colour, size = 80) {
-    const r = 28, cx = size / 2, cy = size / 2 + 8, circ = Math.PI * r;
-    const offset = circ * (1 - pct / 100);
-    return `<svg width="${size}" height="${Math.round(size * 0.7)}" viewBox="0 0 ${size} ${Math.round(size * 0.7)}">
-      <path d="M${cx - r},${cy} A${r},${r},0,0,1,${cx + r},${cy}" fill="none" stroke="#1F2937" stroke-width="6"/>
-      <path d="M${cx - r},${cy} A${r},${r},0,0,1,${cx + r},${cy}" fill="none" stroke="${colour}" stroke-width="6"
-        stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" stroke-linecap="round"/>
-      <text x="${cx}" y="${cy - 2}" text-anchor="middle" fill="${colour}" font-size="16" font-weight="700" font-family="'Inter',monospace">${pct}</text>
+  /* ── Full-circle ring gauge (consistent with web UI) ── */
+  function ringGauge(score, colour, size = 90) {
+    const r = 32, cx = size / 2, cy = size / 2;
+    const circ = 2 * Math.PI * r;
+    const fill = circ * (score / 100);
+    const gap  = circ - fill;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#E5E7EB" stroke-width="6"/>
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${colour}" stroke-width="6"
+        stroke-linecap="round"
+        stroke-dasharray="${fill.toFixed(1)} ${gap.toFixed(1)}"
+        transform="rotate(-90 ${cx} ${cy})"/>
+      <text x="${cx}" y="${cy + 6}" text-anchor="middle" fill="${colour}" font-size="18" font-weight="700" font-family="Inter,sans-serif">${score}</text>
     </svg>`;
   }
 
-  function pdfSection(title, content) {
-    return `<div style="margin-bottom:28px;page-break-inside:avoid">
-      <div style="font-family:monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#00E676;border-bottom:1px solid #1F2937;padding-bottom:6px;margin-bottom:14px">${e(title)}</div>
-      ${content}</div>`;
-  }
-
-  function pdfKV(k, v, col) {
-    if (v == null || v === '') return '';
-    return `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #1F2937;font-size:12px">
-      <span style="color:#6B7280;font-family:monospace;font-size:10px;text-transform:uppercase">${e(k)}</span>
-      <span style="color:${col || '#F9FAFB'};text-align:right;max-width:60%">${e(v)}</span>
+  /* ── Section header ── */
+  function section(title, content) {
+    return `<div style="margin-bottom:32px;page-break-inside:avoid">
+      <div style="font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#6B7280;
+                  border-bottom:2px solid #111827;padding-bottom:7px;margin-bottom:16px">${e(title)}</div>
+      ${content}
     </div>`;
   }
 
-  const colors = p02.primary_colors || p02.extracted_colors || [];
-  const colSwatches = colors.slice(0, 8).map(c =>
-    `<div style="width:28px;height:28px;border-radius:4px;background:${e(c)};display:inline-block;margin-right:4px;border:1px solid rgba(255,255,255,.1)" title="${e(c)}"></div>`).join('');
+  /* ── Key-value row ── */
+  function kv(k, v, colOverride) {
+    if (v == null || v === '') return '';
+    const vc = colOverride || '#111827';
+    return `<div style="display:flex;justify-content:space-between;align-items:baseline;
+                        padding:6px 0;border-bottom:1px solid #F3F4F6;font-size:12px">
+      <span style="color:#6B7280;font-size:10.5px;flex-shrink:0;margin-right:12px">${e(k)}</span>
+      <span style="color:${vc};text-align:right;font-weight:500">${e(String(v))}</span>
+    </div>`;
+  }
 
-  const compRows = (p04.competitors || []).slice(0, 5).map(c => `
-    <tr>
-      <td style="font-weight:600;color:#00E676;font-family:monospace;font-size:11px;padding:7px 8px;border-bottom:1px solid #1F2937">${e(c.name || '')}</td>
-      <td style="padding:7px 8px;border-bottom:1px solid #1F2937;font-size:11px;color:#9CA3AF">${e(c.brand_positioning || '—')}</td>
-      <td style="padding:7px 8px;border-bottom:1px solid #1F2937;font-size:11px">${e(c.events_activity || '—')}</td>
-      <td style="padding:7px 8px;border-bottom:1px solid #1F2937;font-size:11px;color:#6B7280">${e(c.experiential_gap || '—')}</td>
+  /* ── Pill / badge ── */
+  function pill(text, bg, border, col) {
+    return `<span style="display:inline-block;font-size:9.5px;padding:2px 8px;background:${bg};
+                          border:1px solid ${border};color:${col};border-radius:100px;white-space:nowrap">${e(text)}</span>`;
+  }
+
+  /* ── Highlight box ── */
+  function highlight(text, accent) {
+    return `<div style="margin-top:10px;font-size:11.5px;line-height:1.65;
+                        padding:10px 13px;background:${accent}10;
+                        border-left:3px solid ${accent};border-radius:0 4px 4px 0">${e(text)}</div>`;
+  }
+
+  /* ── Brand color swatches ── */
+  const colors = p02.primary_colors || p02.extracted_colors || [];
+  const swatches = colors.slice(0, 8).map(c =>
+    `<div style="width:26px;height:26px;border-radius:50%;background:${e(c)};
+                 display:inline-block;margin-right:5px;border:2px solid #fff;
+                 box-shadow:0 0 0 1px #E5E7EB" title="${e(c)}"></div>`).join('');
+
+  /* ── Competitor table rows ── */
+  const compRows = (p04.competitors || []).slice(0, 5).map((c, i) => `
+    <tr style="background:${i % 2 === 0 ? '#fff' : '#F9FAFB'}">
+      <td style="font-weight:600;font-size:11.5px;padding:8px 10px;border-bottom:1px solid #E5E7EB;color:#111827">${e(c.name || '')}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #E5E7EB;font-size:11px;color:#374151;max-width:160px">${e(c.brand_positioning || '—')}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #E5E7EB;font-size:11px;text-align:center">
+        ${c.events_activity === 'YES' ? pill('YES','#ECFDF5','#A7F3D0','#065F46') : c.events_activity === 'NO' ? pill('NO','#FEF2F2','#FECACA','#991B1B') : pill(c.events_activity||'—','#F9FAFB','#E5E7EB','#6B7280')}
+      </td>
+      <td style="padding:8px 10px;border-bottom:1px solid #E5E7EB;font-size:11px;color:#6B7280;max-width:160px">${e(c.experiential_gap || '—')}</td>
     </tr>`).join('');
 
+  /* ── Events timeline ── */
   const eventCards = (p06.events_timeline || []).slice(0, 8).map(ev => `
-    <div style="padding:10px 12px;background:#111827;border:1px solid #1F2937;border-left:3px solid #00E676;border-radius:4px;margin-bottom:8px;page-break-inside:avoid">
-      <div style="display:flex;justify-content:space-between;margin-bottom:5px">
-        <span style="font-weight:600;font-size:13px">${e(ev.event_name || ev.name || '?')}</span>
-        <span style="font-family:monospace;font-size:10px;color:#6B7280">${e(ev.date || ev.year || '')}</span>
-      </div>
-      <div style="display:flex;gap:5px;flex-wrap:wrap">
-        ${ev.format ? `<span style="font-family:monospace;font-size:9px;padding:1px 6px;border:1px solid rgba(59,130,246,.3);color:#3B82F6;border-radius:3px">${e(ev.format)}</span>` : ''}
-        ${ev.brand_role ? `<span style="font-family:monospace;font-size:9px;padding:1px 6px;border:1px solid rgba(16,185,129,.3);color:#10B981;border-radius:3px">${e(ev.brand_role)}</span>` : ''}
-        ${ev.location ? `<span style="font-family:monospace;font-size:9px;padding:1px 6px;border:1px solid #374151;color:#9CA3AF;border-radius:3px">📍 ${e(ev.location)}</span>` : ''}
+    <div style="display:flex;gap:12px;padding:11px 0;border-bottom:1px solid #F3F4F6;page-break-inside:avoid">
+      <div style="flex-shrink:0;font-size:10px;color:#9CA3AF;width:52px;padding-top:1px">${e(ev.date || ev.year || '—')}</div>
+      <div style="flex:1">
+        <div style="font-weight:600;font-size:12.5px;color:#111827;margin-bottom:4px">${e(ev.event_name || ev.name || '?')}</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          ${ev.format ? pill(ev.format,'#EFF6FF','#BFDBFE','#1D4ED8') : ''}
+          ${ev.brand_role ? pill(ev.brand_role,'#ECFDF5','#A7F3D0','#065F46') : ''}
+          ${ev.location ? `<span style="font-size:10px;color:#9CA3AF">📍 ${e(ev.location)}</span>` : ''}
+        </div>
       </div>
     </div>`).join('');
 
+  /* ── People cards ── */
   const peopleCards = (p09.buying_committee || []).slice(0, 4).map(p => {
     const ct = (p10.contacts || []).find(c => c.name === p.name) || {};
     return `
-    <div style="padding:14px;background:#111827;border:1px solid #1F2937;border-radius:8px;margin-bottom:10px;page-break-inside:avoid">
-      <div style="font-weight:700;font-size:14px;margin-bottom:2px">${e(p.name || '—')}</div>
-      <div style="font-size:11px;color:#9CA3AF;margin-bottom:10px">${e(p.title || '—')}</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
-        ${p.outreach_priority === 'PRIMARY' ? `<span style="font-family:monospace;font-size:9px;padding:2px 7px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25);color:#10B981;border-radius:100px">PRIMARY</span>` : ''}
-        ${ct.email ? `<span style="font-family:monospace;font-size:9px;padding:2px 7px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);color:#3B82F6;border-radius:100px">✉ ${e(ct.email)}</span>` : ''}
-        ${p.decision_relevance_score ? `<span style="font-family:monospace;font-size:9px;padding:2px 7px;border:1px solid #374151;color:#6B7280;border-radius:100px">Score ${p.decision_relevance_score}/5</span>` : ''}
+    <div style="padding:14px 16px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;
+                margin-bottom:10px;page-break-inside:avoid">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+        <div>
+          <div style="font-weight:700;font-size:14px;color:#111827">${e(p.name || '—')}</div>
+          <div style="font-size:11.5px;color:#6B7280;margin-top:1px">${e(p.title || '—')}</div>
+        </div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
+          ${p.outreach_priority === 'PRIMARY' ? pill('PRIMARY','#ECFDF5','#A7F3D0','#065F46') : pill('SECONDARY','#F9FAFB','#E5E7EB','#6B7280')}
+        </div>
       </div>
-      ${p.personalisation_hook ? `<div style="font-size:11px;color:#6B7280;font-style:italic;margin-top:4px">${e(p.personalisation_hook)}</div>` : ''}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+        ${ct.email ? `<span style="font-size:10.5px;color:#2563EB">✉ ${e(ct.email)}</span>` : ''}
+        ${p.linkedin_url ? `<span style="font-size:10.5px;color:#2563EB">🔗 LinkedIn</span>` : ''}
+      </div>
+      ${p.personalisation_hook ? `<div style="font-size:11px;color:#6B7280;font-style:italic;padding-top:5px;border-top:1px solid #E5E7EB">${e(p.personalisation_hook)}</div>` : ''}
     </div>`;
   }).join('');
 
-  // Build outreach sequences — multi-person
+  /* ── Outreach sequences ── */
   let sequences = (p11.contacts_sequences || []).filter(s => s.contact && s.sequence);
   if (!sequences.length && p11.outreach_sequence) {
-    sequences = [{ contact: p11.primary_contact || {}, sequence: p11.outreach_sequence, personalisation_vars: p11.personalisation_variables_used || {} }];
+    sequences = [{ contact: p11.primary_contact || {}, sequence: p11.outreach_sequence }];
   }
 
+  const channelStyle = isLI => isLI
+    ? { bg:'#EFF6FF', border:'#BFDBFE', col:'#1D4ED8', accent:'#2563EB' }
+    : { bg:'#F0FDF4', border:'#BBF7D0', col:'#065F46', accent:'#059669' };
+
   const outreachSections = sequences.slice(0, 4).map((item, idx) => {
-    const c    = item.contact  || {};
-    const seq  = item.sequence || {};
+    const c   = item.contact  || {};
+    const seq = item.sequence || {};
     const touches = Object.entries(seq)
       .filter(([, t]) => t && typeof t === 'object')
       .sort(([a], [b]) => (parseInt(a.replace(/\D/g,''))||0) - (parseInt(b.replace(/\D/g,''))||0));
 
     const touchCards = touches.map(([key, t]) => {
       const isLI = (t.channel || '').toLowerCase() === 'linkedin';
+      const s    = channelStyle(isLI);
       return `
-      <div style="padding:14px;background:#111827;border:1px solid #1F2937;border-left:3px solid ${isLI ? '#3B82F6' : '#00E676'};border-radius:4px;margin-bottom:10px;page-break-inside:avoid">
-        <div style="display:flex;justify-content:space-between;margin-bottom:8px">
-          <span style="font-family:monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:${isLI ? '#3B82F6' : '#00E676'}">${e(t.channel || key)}</span>
-          <span style="font-family:monospace;font-size:10px;color:#6B7280">Day ${t.send_day || '—'}</span>
+      <div style="padding:13px 15px;background:${s.bg};border:1px solid ${s.border};
+                  border-radius:6px;margin-bottom:10px;page-break-inside:avoid">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${s.col}">${e(t.channel || key)}</span>
+          <span style="font-size:10px;color:#6B7280;font-weight:500">Day ${t.send_day || '—'}</span>
         </div>
-        ${t.subject_line ? `<div style="font-weight:600;font-size:13px;margin-bottom:8px">📧 ${e(t.subject_line)}</div>` : ''}
-        <div style="font-size:12px;color:#9CA3AF;line-height:1.75;white-space:pre-line">${e(t.message || '—')}</div>
+        ${t.subject_line ? `<div style="font-weight:700;font-size:12.5px;color:#111827;margin-bottom:8px">${e(t.subject_line)}</div>` : ''}
+        <div style="font-size:12px;color:#374151;line-height:1.75;white-space:pre-line">${e(t.message || '—')}</div>
       </div>`;
     }).join('');
 
     return `
-    <div style="margin-bottom:28px;page-break-before:${idx > 0 ? 'always' : 'avoid'}">
-      <div style="font-family:monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#00E676;border-bottom:1px solid #1F2937;padding-bottom:6px;margin-bottom:14px">
-        Sequence ${idx + 1} of ${sequences.length} — ${e(c.name || 'Unknown')}
-      </div>
-      <div style="padding:10px 14px;background:#111827;border:1px solid #1F2937;border-radius:6px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;font-size:12px">
-        <span style="font-weight:700">${e(c.name || '—')}</span>
-        ${c.title ? `<span style="color:#9CA3AF">${e(c.title)}</span>` : ''}
-        ${c.email ? `<span style="font-family:monospace;font-size:11px;color:#3B82F6">✉ ${e(c.email)}</span>` : ''}
-        ${c.outreach_priority === 'PRIMARY' ? `<span style="font-family:monospace;font-size:9px;padding:2px 7px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25);color:#10B981;border-radius:100px">PRIMARY</span>` : ''}
+    <div style="margin-bottom:32px;page-break-before:${idx > 0 ? 'always' : 'auto'}">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid #111827">
+        <div style="background:#111827;color:#fff;font-size:10px;font-weight:700;padding:3px 9px;border-radius:100px">${idx + 1} of ${sequences.length}</div>
+        <div>
+          <span style="font-weight:700;font-size:14px;color:#111827">${e(c.name || '—')}</span>
+          ${c.title ? `<span style="color:#6B7280;font-size:12px;margin-left:8px">${e(c.title)}</span>` : ''}
+        </div>
+        ${c.outreach_priority === 'PRIMARY' ? pill('PRIMARY','#ECFDF5','#A7F3D0','#065F46') : ''}
       </div>
       ${touchCards}
     </div>`;
   }).join('');
 
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  /* ── Stat box (cover page metrics) ── */
+  function statBox(label, value, col) {
+    return `<div style="text-align:center;padding:20px 16px;background:#fff;border:1px solid #E5E7EB;border-radius:10px">
+      <div style="font-size:26px;font-weight:800;color:${col};font-variant-numeric:tabular-nums;margin-bottom:4px">${e(String(value))}</div>
+      <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#9CA3AF">${e(label)}</div>
+    </div>`;
+  }
+
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>
 <title>BrandScope — ${e(data.company_name)}</title>
 <style>
-  @page { size: A4; margin: 16mm 20mm; }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  @page { size: A4; margin: 14mm 18mm; }
   * { box-sizing:border-box; margin:0; padding:0; }
-  body { background:#0B0F1A; color:#F9FAFB; font-family:'Inter',system-ui,sans-serif; font-size:13px; line-height:1.6; }
+  body { background:#fff; color:#111827; font-family:'Inter',system-ui,sans-serif; font-size:13px; line-height:1.6; }
   .pb { page-break-before: always; }
-  @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
+  @media print {
+    body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .no-break { page-break-inside:avoid; }
+  }
 </style></head><body>
 
-<!-- COVER -->
-<div style="min-height:100vh;display:flex;flex-direction:column;justify-content:space-between;padding:48px 40px;background:#0B0F1A">
-  <div>
-    <div style="font-family:monospace;font-size:11px;letter-spacing:.2em;color:#00E676;text-transform:uppercase;margin-bottom:10px">◈ BrandScope Intelligence Report</div>
-    <h1 style="font-size:40px;font-weight:700;color:#F9FAFB;letter-spacing:-.03em;margin-bottom:6px">${e(data.company_name)}</h1>
-    <div style="font-family:monospace;font-size:13px;color:#6B7280;margin-bottom:40px">${e(data.category || '')}</div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;max-width:580px">
-      <div style="background:#111827;border:1px solid #1F2937;border-radius:8px;padding:16px;text-align:center">
-        ${svgGauge(icp, icpCol, 80)}
-        <div style="font-family:monospace;font-size:9px;letter-spacing:.1em;color:#6B7280;text-transform:uppercase;margin-top:4px">ICP Score</div>
+<!-- ═══ COVER PAGE ═══ -->
+<div style="min-height:100vh;display:flex;flex-direction:column;padding:52px 44px;background:#fff">
+
+  <!-- Header bar -->
+  <div style="display:flex;justify-content:space-between;align-items:center;
+              padding-bottom:18px;border-bottom:3px solid #111827;margin-bottom:48px">
+    <div style="font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#111827">
+      BrandScope · Intelligence Report
+    </div>
+    <div style="font-size:10px;color:#9CA3AF">
+      ${new Date().toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'})}
+    </div>
+  </div>
+
+  <!-- Company + category -->
+  <div style="flex:1">
+    <div style="font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+                color:#6B7280;margin-bottom:10px">${e(data.category || '')}</div>
+    <h1 style="font-size:52px;font-weight:800;color:#111827;letter-spacing:-.04em;
+               line-height:1.05;margin-bottom:28px">${e(data.company_name)}</h1>
+
+    <!-- ICP ring + key metrics -->
+    <div style="display:flex;align-items:center;gap:32px;margin-bottom:48px">
+      <div style="text-align:center">
+        ${ringGauge(icp, icpCol, 100)}
+        <div style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#9CA3AF;margin-top:4px">ICP Score</div>
+        <div style="font-size:9.5px;font-weight:600;color:${icpCol};margin-top:2px">${icp >= 70 ? 'HIGH FIT' : icp >= 40 ? 'MEDIUM FIT' : 'LOW FIT'}</div>
       </div>
-      <div style="background:#111827;border:1px solid #1F2937;border-radius:8px;padding:16px;text-align:center">
-        <div style="font-size:26px;font-weight:700;font-family:monospace;color:${p08.overall_verdict === 'GREEN' ? '#10B981' : p08.overall_verdict === 'RED' ? '#EF4444' : '#F59E0B'};margin-bottom:4px">${e(p08.overall_verdict || '—')}</div>
-        <div style="font-family:monospace;font-size:9px;letter-spacing:.1em;color:#6B7280;text-transform:uppercase">Watchout</div>
+      <div style="flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+        ${statBox('Watchout', p08.overall_verdict || '—', verdictCol(p08.overall_verdict))}
+        ${statBox('Event Maturity', (p06.experiential_maturity_score || '—') + ' / 5', '#2563EB')}
+        ${statBox('Contacts Found', p09.total_contacts_found || (p09.buying_committee || []).length || 0, '#7C3AED')}
       </div>
-      <div style="background:#111827;border:1px solid #1F2937;border-radius:8px;padding:16px;text-align:center">
-        <div style="font-size:26px;font-weight:700;font-family:monospace;color:#10B981;margin-bottom:4px">${e(p06.experiential_maturity_score || '—')}<span style="font-size:13px;color:#6B7280">/5</span></div>
-        <div style="font-family:monospace;font-size:9px;letter-spacing:.1em;color:#6B7280;text-transform:uppercase">Events</div>
-      </div>
-      <div style="background:#111827;border:1px solid #1F2937;border-radius:8px;padding:16px;text-align:center">
-        <div style="font-size:26px;font-weight:700;font-family:monospace;color:#10B981;margin-bottom:4px">${p09.total_contacts_found || (p09.buying_committee || []).length || 0}</div>
-        <div style="font-family:monospace;font-size:9px;letter-spacing:.1em;color:#6B7280;text-transform:uppercase">Contacts</div>
+    </div>
+
+    <!-- Quick insights strip -->
+    <div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:18px 22px">
+      <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#6B7280;margin-bottom:10px">Intelligence Summary</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 28px;font-size:12px">
+        ${p01.business_model ? `<div><span style="color:#9CA3AF">Model: </span><span style="font-weight:600">${e(p01.business_model)}</span></div>` : ''}
+        ${p01.funding_status ? `<div><span style="color:#9CA3AF">Funding: </span><span style="font-weight:600">${e(p01.funding_status)}</span></div>` : ''}
+        ${p03.brand_sentiment ? `<div><span style="color:#9CA3AF">Sentiment: </span><span style="font-weight:600">${e(p03.brand_sentiment)}</span></div>` : ''}
+        ${p07.reputation_label ? `<div><span style="color:#9CA3AF">Reputation: </span><span style="font-weight:600">${e(p07.reputation_label)}</span></div>` : ''}
+        ${p08.timing_recommendation ? `<div><span style="color:#9CA3AF">Timing: </span><span style="font-weight:600">${e(p08.timing_recommendation)}</span></div>` : ''}
+        ${p01.experiential_readiness ? `<div><span style="color:#9CA3AF">Readiness: </span><span style="font-weight:600">${e(p01.experiential_readiness)}</span></div>` : ''}
       </div>
     </div>
   </div>
-  <div style="font-family:monospace;font-size:10px;color:#374151;letter-spacing:.06em">
-    ${e(data.run_id || '')} · Generated ${new Date().toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'})} · ${data.total_elapsed?.toFixed(1) || '?'}s · 12 pipelines
+
+  <!-- Footer -->
+  <div style="margin-top:40px;padding-top:16px;border-top:1px solid #E5E7EB;
+              display:flex;justify-content:space-between;font-size:9.5px;color:#9CA3AF">
+    <span>Built by StepOneXP · Brand Intelligence System</span>
+    <span>${e(data.run_id || '')} · ${data.total_elapsed?.toFixed(1) || '?'}s · 12 pipelines</span>
   </div>
 </div>
 
-<!-- COMPANY + BRAND -->
-<div class="pb" style="padding:40px">
-  ${pdfSection('Company Overview', `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+<!-- ═══ PAGE 2: Company Overview + Brand Identity ═══ -->
+<div class="pb" style="padding:40px 44px">
+
+  ${section('Company Overview', `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px">
       <div>
-        ${pdfKV('Business Model', p01.business_model)}
-        ${pdfKV('Industry', p01.industry_vertical)}
-        ${pdfKV('Founded', p01.founding_year)}
-        ${pdfKV('Employees', p01.employee_count_range)}
-        ${pdfKV('Funding', p01.funding_status)}
-        ${pdfKV('Revenue', p01.revenue_range)}
-        ${pdfKV('HQ', p01.hq_city ? p01.hq_city + ', ' + (p01.geography || '') : p01.geography)}
-        ${pdfKV('Readiness', p01.experiential_readiness)}
-        ${pdfKV('Service', p01.recommended_service)}
+        ${kv('Business Model', p01.business_model)}
+        ${kv('Industry', p01.industry_vertical)}
+        ${kv('Founded', p01.founding_year)}
+        ${kv('Employees', p01.employee_count_range)}
+        ${kv('Funding Status', p01.funding_status)}
+        ${kv('Revenue Range', p01.revenue_range)}
+        ${kv('Headquarters', p01.hq_city ? p01.hq_city + (p01.geography ? ', ' + p01.geography : '') : p01.geography)}
+        ${kv('Experiential Readiness', p01.experiential_readiness, p01.experiential_readiness === 'HIGH' ? '#059669' : p01.experiential_readiness === 'LOW' ? '#DC2626' : '#D97706')}
+        ${kv('Recommended Service', p01.recommended_service)}
       </div>
       <div>
-        <div style="font-size:12px;color:#9CA3AF;line-height:1.75;padding:14px;background:#111827;border-radius:6px;border:1px solid #1F2937">${e(p01.company_narrative || 'No narrative.')}</div>
+        <div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:15px;
+                    font-size:12px;color:#374151;line-height:1.75;margin-bottom:12px">
+          ${e(p01.company_narrative || 'No narrative available.')}
+        </div>
+        ${(p01.key_facts || []).length ? `
+        <div>
+          ${p01.key_facts.slice(0, 4).map(f => `
+            <div style="font-size:11.5px;color:#374151;padding:5px 0 5px 12px;
+                        border-left:2px solid #E5E7EB;margin-bottom:4px">${e(f)}</div>`).join('')}
+        </div>` : ''}
       </div>
     </div>
   `)}
 
-  ${pdfSection('Brand Identity', `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+  ${section('Brand Identity', `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px">
       <div>
-        ${colSwatches ? `<div style="margin-bottom:12px">${colSwatches}</div>` : ''}
-        ${pdfKV('Primary Font', (p02.primary_fonts || p02.extracted_fonts || [])[0])}
-        ${pdfKV('Brand Tone', p02.brand_tone)}
-        ${pdfKV('Visual Style', p02.visual_style)}
-        ${pdfKV('Brand Maturity', p02.brand_maturity)}
-        ${pdfKV('Tagline', p02.tagline)}
+        ${swatches ? `<div style="margin-bottom:14px">
+          <div style="font-size:9.5px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;font-weight:600">Brand Palette</div>
+          ${swatches}
+        </div>` : ''}
+        ${kv('Primary Font', (p02.primary_fonts || p02.extracted_fonts || [])[0])}
+        ${kv('Brand Tone', p02.brand_tone)}
+        ${kv('Visual Style', p02.visual_style)}
+        ${kv('Brand Maturity', p02.brand_maturity)}
+        ${p02.tagline ? kv('Tagline', p02.tagline) : ''}
       </div>
       <div>
-        ${(p02.brand_voice_keywords || []).length ? `<div style="margin-bottom:10px"><div style="font-family:monospace;font-size:9px;color:#6B7280;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Voice Keywords</div><div style="display:flex;flex-wrap:wrap;gap:4px">${p02.brand_voice_keywords.map(k => `<span style="font-family:monospace;font-size:10px;padding:2px 7px;background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.25);color:#00E676;border-radius:100px">${e(k)}</span>`).join('')}</div></div>` : ''}
-        ${p02.experiential_design_angle ? `<div style="font-size:12px;color:#9CA3AF;line-height:1.65;padding:12px;background:#111827;border:1px solid #1F2937;border-radius:6px;margin-top:8px">🎨 ${e(p02.experiential_design_angle)}</div>` : ''}
+        ${(p02.brand_voice_keywords || []).length ? `
+        <div style="margin-bottom:14px">
+          <div style="font-size:9.5px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.1em;font-weight:600;margin-bottom:8px">Voice Keywords</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px">
+            ${p02.brand_voice_keywords.map(k => pill(k,'#F0FDF4','#BBF7D0','#065F46')).join('')}
+          </div>
+        </div>` : ''}
+        ${p02.experiential_design_angle ? highlight('Design angle for experiential: ' + p02.experiential_design_angle, '#7C3AED') : ''}
       </div>
     </div>
   `)}
 </div>
 
-<!-- MARKET + COMPETITORS -->
-<div class="pb" style="padding:40px">
-  ${pdfSection('Market Position & Reputation', `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+<!-- ═══ PAGE 3: Market Position + Competitors ═══ -->
+<div class="pb" style="padding:40px 44px">
+
+  ${section('Market Position & Reputation', `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px">
       <div>
-        <div style="font-family:monospace;font-size:9px;color:#6B7280;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Market Position</div>
-        ${pdfKV('Share of Voice', p03.share_of_voice_level)}
-        ${pdfKV('Sentiment', p03.brand_sentiment)}
-        ${pdfKV('Perception Gap', p03.perception_gap_score ? p03.perception_gap_score + '/5' : null)}
-        ${p03.market_position_summary ? `<div style="margin-top:10px;font-size:11px;color:#6B7280;line-height:1.65">${e(p03.market_position_summary)}</div>` : ''}
+        <div style="font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:#6B7280;margin-bottom:10px">Market Position</div>
+        ${kv('Share of Voice', p03.share_of_voice_level)}
+        ${kv('Sentiment', p03.brand_sentiment, p03.brand_sentiment === 'POSITIVE' ? '#059669' : p03.brand_sentiment === 'NEGATIVE' ? '#DC2626' : '#374151')}
+        ${kv('Perception Gap', p03.perception_gap_score ? p03.perception_gap_score + ' / 5' : null)}
+        ${kv('Recent Shift', p03.recent_sentiment_shift)}
+        ${p03.market_position_summary ? `<div style="margin-top:10px;font-size:11.5px;color:#374151;line-height:1.65">${e(p03.market_position_summary)}</div>` : ''}
+        ${p03.pitch_implication ? highlight(p03.pitch_implication, '#2563EB') : ''}
       </div>
       <div>
-        <div style="font-family:monospace;font-size:9px;color:#6B7280;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Reputation</div>
-        ${pdfKV('Score', p07.overall_reputation_score ? p07.overall_reputation_score + '/100' : null)}
-        ${pdfKV('Label', p07.reputation_label)}
-        ${pdfKV('NPS Signal', p07.nps_signal)}
-        ${pdfKV('Community', p07.brand_community_strength)}
-        ${p07.reputation_opportunity ? `<div style="margin-top:10px;font-size:11px;color:#10B981;padding:8px 10px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25);border-radius:4px">🎯 ${e(p07.reputation_opportunity)}</div>` : ''}
+        <div style="font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:#6B7280;margin-bottom:10px">Reputation</div>
+        ${kv('Score', p07.overall_reputation_score ? p07.overall_reputation_score + ' / 100' : null)}
+        ${kv('Label', p07.reputation_label, p07.reputation_label === 'STRONG' || p07.reputation_label === 'GOOD' ? '#059669' : p07.reputation_label === 'POOR' ? '#DC2626' : '#374151')}
+        ${kv('NPS Signal', p07.nps_signal)}
+        ${kv('Community', p07.brand_community_strength)}
+        ${p07.recent_controversy ? `<div style="margin-top:8px;font-size:11.5px;padding:8px 10px;background:#FEF2F2;border-left:3px solid #DC2626;border-radius:0 4px 4px 0;color:#7F1D1D">⚠ ${e(p07.recent_controversy)}</div>` : ''}
+        ${p07.reputation_opportunity ? highlight(p07.reputation_opportunity, '#059669') : ''}
       </div>
     </div>
   `)}
 
-  ${pdfSection('Competitor Mapping', `
-    ${compRows ? `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
-      <thead><tr>
-        <th style="font-family:monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#6B7280;padding:6px 8px;text-align:left;border-bottom:1px solid #1F2937">Brand</th>
-        <th style="font-family:monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#6B7280;padding:6px 8px;text-align:left;border-bottom:1px solid #1F2937">Positioning</th>
-        <th style="font-family:monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#6B7280;padding:6px 8px;text-align:left;border-bottom:1px solid #1F2937">Events</th>
-        <th style="font-family:monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#6B7280;padding:6px 8px;text-align:left;border-bottom:1px solid #1F2937">Their Gap</th>
+  ${section('Competitor Mapping', `
+    ${compRows ? `<table style="width:100%;border-collapse:collapse;border:1px solid #E5E7EB;border-radius:8px;overflow:hidden">
+      <thead><tr style="background:#F9FAFB">
+        <th style="font-size:9.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#6B7280;padding:8px 10px;text-align:left;border-bottom:2px solid #E5E7EB">Brand</th>
+        <th style="font-size:9.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#6B7280;padding:8px 10px;text-align:left;border-bottom:2px solid #E5E7EB">Positioning</th>
+        <th style="font-size:9.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#6B7280;padding:8px 10px;text-align:center;border-bottom:2px solid #E5E7EB">Events</th>
+        <th style="font-size:9.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#6B7280;padding:8px 10px;text-align:left;border-bottom:2px solid #E5E7EB">Their Gap</th>
       </tr></thead>
-      <tbody>${compRows}</tbody></table></div>` : '<div style="color:#6B7280;font-family:monospace;font-size:12px">No competitor data</div>'}
-    ${p04.experiential_white_space ? `<div style="margin-top:12px;font-size:12px;color:#00E676;padding:10px 12px;background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.25);border-radius:4px">🎯 White space: ${e(p04.experiential_white_space)}</div>` : ''}
+      <tbody>${compRows}</tbody>
+    </table>` : '<div style="color:#9CA3AF;font-size:12px">No competitor data available.</div>'}
+    ${p04.experiential_white_space ? highlight('White space opportunity: ' + p04.experiential_white_space, '#059669') : ''}
+    ${p04.recommended_pitch_angle ? highlight('Recommended angle: ' + p04.recommended_pitch_angle, '#7C3AED') : ''}
   `)}
 </div>
 
-<!-- EVENTS -->
-<div class="pb" style="padding:40px">
-  ${pdfSection('Experiential Footprint', `
-    <div style="display:grid;grid-template-columns:160px 1fr;gap:24px;margin-bottom:20px">
-      <div style="text-align:center;padding:16px;background:#111827;border:1px solid #1F2937;border-radius:8px">
-        <div style="font-size:40px;font-weight:700;font-family:monospace;color:#10B981">${p06.experiential_maturity_score || '?'}</div>
-        <div style="font-size:10px;font-family:monospace;color:#6B7280;text-transform:uppercase;letter-spacing:.1em">/5 Maturity</div>
+<!-- ═══ PAGE 4: Experiential Footprint ═══ -->
+<div class="pb" style="padding:40px 44px">
+
+  ${section('Experiential & Events Footprint', `
+    <div style="display:grid;grid-template-columns:130px 1fr;gap:24px;margin-bottom:24px">
+      <div style="text-align:center;padding:18px 12px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px">
+        <div style="font-size:44px;font-weight:800;color:#2563EB;line-height:1">${p06.experiential_maturity_score || '?'}</div>
+        <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:#9CA3AF;margin-top:4px">/ 5 Maturity</div>
+        ${p06.confidence_level ? `<div style="margin-top:8px">${pill(p06.confidence_level,'#EFF6FF','#BFDBFE','#1D4ED8')}</div>` : ''}
       </div>
       <div>
-        ${pdfKV('Events Found', (p06.events_timeline || []).length || null)}
-        ${pdfKV('Frequency', p06.events_frequency)}
-        ${pdfKV('Last Event', p06.last_event_months_ago != null ? p06.last_event_months_ago + ' months ago' : null)}
-        ${pdfKV('Geography', (p06.geography_of_events || []).join(' · ') || null)}
-        ${p06.pitch_angle ? `<div style="margin-top:10px;font-size:12px;color:#00E676;padding:8px 10px;background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.25);border-radius:4px">🎯 ${e(p06.pitch_angle)}</div>` : ''}
+        ${kv('Events in Timeline', (p06.events_timeline || []).length || null)}
+        ${kv('Frequency', p06.events_frequency)}
+        ${kv('Last Event', p06.last_event_months_ago != null ? p06.last_event_months_ago + ' months ago' : null)}
+        ${kv('Geography', (p06.geography_of_events || []).slice(0,4).join(', ') || null)}
+        ${p06.maturity_score_reasoning ? `<div style="margin-top:8px;font-size:11.5px;color:#6B7280;line-height:1.6">${e(p06.maturity_score_reasoning)}</div>` : ''}
+        ${p06.pitch_angle ? highlight(p06.pitch_angle, '#059669') : ''}
       </div>
     </div>
-    ${eventCards || '<div style="color:#6B7280;font-family:monospace;font-size:12px;padding:16px 0">No confirmed events found</div>'}
-    ${(p06.formats_missing || []).length ? `<div style="margin-top:12px;padding:10px 12px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:4px;font-size:11px;color:#F59E0B">📌 Missing formats: ${e(p06.formats_missing.join(' · '))}</div>` : ''}
+
+    ${eventCards ? `<div style="margin-bottom:16px">${eventCards}</div>` : '<div style="color:#9CA3AF;font-size:12px;padding:16px 0">No confirmed events found in research period.</div>'}
+
+    ${(p06.formats_missing || []).length ? `
+    <div style="padding:11px 14px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:6px;font-size:11.5px;color:#92400E">
+      <span style="font-weight:600">Missing formats: </span>${e(p06.formats_missing.join(' · '))}
+    </div>` : ''}
   `)}
 </div>
 
-<!-- DECISION MAKERS -->
-<div class="pb" style="padding:40px">
-  ${pdfSection('Decision Makers & Contact Intelligence', `
-    ${peopleCards || '<div style="color:#6B7280;font-family:monospace;font-size:12px">No decision makers found</div>'}
-    ${p10.email_pattern ? `<div style="margin-top:12px;padding:10px 12px;background:#111827;border:1px solid #1F2937;border-radius:4px;font-family:monospace;font-size:11px;color:#6B7280">Email pattern: <span style="color:#00E676">${e(p10.email_pattern)}</span> · ${p10.verified_emails || 0} verified · ${p10.inferred_emails || 0} inferred</div>` : ''}
+<!-- ═══ PAGE 5: Decision Makers + Watchouts ═══ -->
+<div class="pb" style="padding:40px 44px">
+
+  ${section('Decision Makers & Contact Intelligence', `
+    ${peopleCards || '<div style="color:#9CA3AF;font-size:12px">No decision makers identified.</div>'}
+    ${p10.email_pattern ? `
+    <div style="margin-top:14px;padding:10px 14px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;font-size:11.5px;color:#6B7280">
+      <span style="font-weight:600;color:#374151">Email pattern: </span>
+      <span style="font-family:monospace;color:#2563EB">${e(p10.email_pattern)}</span>
+      <span style="margin-left:12px">${p10.verified_emails || 0} verified · ${p10.inferred_emails || 0} pattern-inferred</span>
+    </div>` : ''}
+    ${p09.committee_gap && p09.committee_gap !== 'None' ? `<div style="margin-top:8px;font-size:11.5px;color:#D97706;padding:8px 12px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:4px">⚑ Gap in committee: ${e(p09.committee_gap)}</div>` : ''}
   `)}
 
-  ${pdfSection('Strategic Watchouts', `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+  ${section('Strategic Watchouts', `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px">
       <div>
-        ${pdfKV('Verdict', p08.overall_verdict, p08.overall_verdict === 'GREEN' ? '#10B981' : p08.overall_verdict === 'RED' ? '#EF4444' : '#F59E0B')}
-        ${pdfKV('Timing', p08.timing_recommendation)}
-        ${pdfKV('Tone', p08.pitch_tone_adjustment)}
-        ${p08.verdict_reasoning ? `<div style="margin-top:10px;font-size:11px;color:#9CA3AF;line-height:1.65">${e(p08.verdict_reasoning)}</div>` : ''}
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+          <div style="font-size:22px;font-weight:800;color:${verdictCol(p08.overall_verdict)}">${e(p08.overall_verdict || '—')}</div>
+          <div style="font-size:11px;color:#6B7280">${e(p08.verdict_reasoning || '')}</div>
+        </div>
+        ${kv('Timing', p08.timing_recommendation, '#2563EB')}
+        ${p08.pitch_tone_adjustment ? kv('Tone Guidance', p08.pitch_tone_adjustment) : ''}
+        ${p08.timing_reasoning ? `<div style="margin-top:8px;font-size:11.5px;color:#6B7280;line-height:1.6">${e(p08.timing_reasoning)}</div>` : ''}
       </div>
       <div>
-        ${(p08.financial_distress_signals || []).length ? `<div style="margin-bottom:12px">${p08.financial_distress_signals.slice(0, 2).map(s => `<div style="font-size:11px;color:#9CA3AF;padding:5px 8px;border-left:2px solid #EF4444;margin-bottom:4px">${e(s)}</div>`).join('')}</div>` : ''}
-        ${(p08.leadership_changes || []).length ? p08.leadership_changes.map(lc => `<div style="font-size:11px;color:#9CA3AF;padding:5px 8px;border-left:2px solid #10B981;margin-bottom:4px"><span style="color:#10B981">${e(lc.role)}</span>: ${e(lc.change)}</div>`).join('') : ''}
+        ${(p08.financial_distress_signals || []).length ? `
+        <div style="margin-bottom:12px">
+          <div style="font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:#DC2626;margin-bottom:6px">Financial Signals</div>
+          ${p08.financial_distress_signals.slice(0, 2).map(s => `<div style="font-size:11px;color:#374151;padding:5px 8px;border-left:2px solid #DC2626;margin-bottom:4px">${e(s)}</div>`).join('')}
+        </div>` : ''}
+        ${(p08.leadership_changes || []).length ? `
+        <div>
+          <div style="font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:#059669;margin-bottom:6px">Leadership Changes</div>
+          ${p08.leadership_changes.slice(0, 2).map(lc => `<div style="font-size:11px;color:#374151;padding:5px 8px;border-left:2px solid #059669;margin-bottom:4px"><span style="font-weight:600">${e(lc.role)}: </span>${e(lc.change)}</div>`).join('')}
+        </div>` : ''}
       </div>
     </div>
   `)}
 </div>
 
-<!-- OUTREACH SEQUENCES -->
-${outreachSections ? `<div class="pb" style="padding:40px">
-  <div style="font-family:monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#00E676;border-bottom:1px solid #1F2937;padding-bottom:6px;margin-bottom:20px">4-Touch Outreach Sequences — ${sequences.length} Contact${sequences.length !== 1 ? 's' : ''}</div>
+<!-- ═══ OUTREACH SEQUENCES ═══ -->
+${outreachSections ? `<div class="pb" style="padding:40px 44px">
+  <div style="font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#6B7280;
+              border-bottom:2px solid #111827;padding-bottom:7px;margin-bottom:24px">
+    4-Touch Outreach Sequences — ${sequences.length} Contact${sequences.length !== 1 ? 's' : ''}
+  </div>
   ${outreachSections}
 </div>` : ''}
 
-<!-- FOOTER -->
-<div style="padding:24px 40px;border-top:1px solid #1F2937;font-family:monospace;font-size:10px;color:#374151;display:flex;justify-content:space-between">
-  <span>BrandScope · Brand Intelligence System</span>
-  <span>${e(data.run_id || '')} · ${data.total_elapsed?.toFixed(1) || '?'}s · 12 pipelines</span>
+<!-- ═══ DOCUMENT FOOTER ═══ -->
+<div style="padding:18px 44px;border-top:1px solid #E5E7EB;
+            display:flex;justify-content:space-between;align-items:center;font-size:9.5px;color:#9CA3AF">
+  <span>BrandScope · Brand Intelligence System · StepOneXP</span>
+  <span>${e(data.run_id || '')} · ${data.total_elapsed?.toFixed(1) || '?'}s · 12 pipelines · ${new Date().getFullYear()}</span>
 </div>
 
 </body></html>`;

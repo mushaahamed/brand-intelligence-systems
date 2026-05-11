@@ -398,9 +398,7 @@ Make Touch 3 sting — name the competitor, say what they're doing, and make THI
             name  = contact.get("name", "there")
             first = name.split()[0] if name else "there"
 
-            log.info("p11_outreach.generating_sequence",
-                     contact=name, title=contact.get("title",""),
-                     role=contact.get("role_type","?"))
+            log.info(f"     Writing personalised sequence for {name}  ·  {contact.get('title','')}")
 
             user_prompt = self._build_user_prompt(
                 contact, structured, comp_lines, campaign_line, events_text
@@ -411,7 +409,6 @@ Make Touch 3 sting — name the competitor, say what they're doing, and make THI
             sequence = safe_json_parse(result) if result else None
 
             if not sequence:
-                log.warning("p11_outreach.gpt_fallback", contact=name)
                 sequence = _build_fallback_sequence(
                     first, structured["company_name"],
                     structured["category"], comp_name, campaign_name

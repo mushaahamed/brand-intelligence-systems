@@ -27,7 +27,7 @@ class CompanyOverviewPipeline(BasePipeline):
         name = self.company_name
         raw  = {"website_pages": [], "news": [], "domain": extract_domain(url)}
 
-        log.info("p01_fetch_website", url=url)
+        log.info(f"     Scanning {url[:70]}...")
         raw["website_pages"] = fast_crawl(url, max_pages=4)
 
         queries = [
@@ -101,7 +101,6 @@ NEWS & FUNDING SIGNALS:
                     )
                 return output
 
-        log.warning("p01_synthesis_failed", company=structured["company_name"])
         return {
             "business_model":         None,
             "industry_vertical":      self.category,

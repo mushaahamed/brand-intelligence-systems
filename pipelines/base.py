@@ -56,24 +56,16 @@ class BasePipeline(ABC):
 
     def run(self) -> dict:
         """Execute the full pipeline. Returns final output or error dict."""
-        log.info("pipeline_start", pipeline=self.pipeline_id, company=self.company_name)
+        log.info(f"  ▶  {self.pipeline_name}")
         t0 = time.time()
 
         try:
-            # Layer 1
-            log.info("layer_1_fetch", pipeline=self.pipeline_id)
-            self._raw_data = self.fetch()
-
-            # Layer 2
-            log.info("layer_2_extract", pipeline=self.pipeline_id)
+            self._raw_data   = self.fetch()
             self._structured = self.extract(self._raw_data)
-
-            # Layer 3
-            log.info("layer_3_synthesise", pipeline=self.pipeline_id)
-            self._output = self.synthesise(self._structured)
+            self._output     = self.synthesise(self._structured)
 
             elapsed = round(time.time() - t0, 2)
-            log.info("pipeline_complete", pipeline=self.pipeline_id, elapsed=elapsed)
+            log.info(f"  ✓  {self.pipeline_name}  ·  {elapsed}s")
 
             return {
                 "pipeline_id":   self.pipeline_id,
@@ -88,7 +80,7 @@ class BasePipeline(ABC):
             }
 
         except Exception as e:
-            log.error("pipeline_error", pipeline=self.pipeline_id, error=str(e))
+            log.error(f"  ✗  {self.pipeline_name}  ·  {str(e)[:100]}")
             return {
                 "pipeline_id":  self.pipeline_id,
                 "company":      self.company_name,

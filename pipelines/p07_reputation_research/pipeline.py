@@ -158,10 +158,11 @@ Update the assessment using the real data. Keep knowledge fields where real data
             enriched_parsed = safe_json_parse(enriched_raw or "")
             if enriched_parsed:
                 result = enriched_parsed
-                log.info("p07_enriched_with_real_data", reddit=structured["reddit_count"])
+                log.info(f"     Community data incorporated — {structured['reddit_count']} discussions analysed")
 
-        log.info("p07_done", label=result.get("reputation_label"),
-                 score=result.get("overall_reputation_score"))
+        rep_label = result.get("reputation_label", "")
+        rep_score = result.get("overall_reputation_score", "")
+        log.info(f"     Reputation: {rep_label} · Score: {rep_score}/100")
 
         return result or {
             "overall_reputation_score": None,

@@ -79,7 +79,7 @@ class ContactIntelligencePipeline(BasePipeline):
                 "linkedin_url":     li_url,
             })
 
-        log.info("p10_done", contacts=len(contacts), domain=domain)
+        log.info(f"     {len(contacts)} contacts enriched · Email patterns inferred for {domain}")
         return {"domain": domain, "contacts_raw": contacts}
 
     def extract(self, raw: dict) -> dict:

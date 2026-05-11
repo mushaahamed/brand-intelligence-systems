@@ -121,7 +121,7 @@ def _scrape_team_page(company_url: str) -> str:
                 tag.decompose()
             text = re.sub(r'\s+', ' ', soup.get_text(separator=" ", strip=True))
             if len(text) > 300:
-                log.info("p09_team_page_found", path=path, chars=len(text))
+                log.info(f"     Team page found at {path}")
                 return text[:3000]
         except Exception:
             pass
@@ -225,7 +225,7 @@ class DecisionMakersPipeline(BasePipeline):
             f"{n} brand marketing \"category manager\" OR \"brand head\" OR \"portfolio\" linkedin",
         ]
         raw["google_results"] = run_google_searches_parallel(queries, PIPELINE_ID, num_results=8)
-        log.info("p09_google_done", results=len(raw["google_results"]))
+        log.info(f"     LinkedIn profiles searched — {len(raw['google_results'])} signals found")
 
         if self.company_url:
             raw["team_page"] = _scrape_team_page(self.company_url)
@@ -267,10 +267,10 @@ Remember: if {n} is a product brand (e.g. a personal care, food, beverage, or co
                                       model=OPENAI_MODEL_FULL, max_tokens=1500)
         knowledge_parsed = safe_json_parse(knowledge_raw or "") or {}
         knowledge_people = knowledge_parsed.get("buying_committee", [])
-        log.info("p09_knowledge_done", contacts=len(knowledge_people))
 
         # ── Source B: Extract from Google search results ───────────────────────
-        search_people = []
+        search_people  = []
+        search_parsed  = {}
         if structured["search_text"].strip():
             search_prompt = f"""COMPANY: {n}
 CATEGORY: {category}
@@ -287,7 +287,6 @@ Extract people from these search results only. Do not invent anyone not found in
             search_raw    = synthesise(SEARCH_SYSTEM_PROMPT, search_prompt, max_tokens=1200)
             search_parsed = safe_json_parse(search_raw or "") or {}
             search_people = search_parsed.get("buying_committee", [])
-            log.info("p09_search_done", contacts=len(search_people))
 
         # ── Build LinkedIn URL map from raw Google results ────────────────────
         li_map = _extract_linkedin_map(structured.get("google_results", []))
@@ -317,9 +316,7 @@ Extract people from these search results only. Do not invent anyone not found in
                              "MEDIUM" if merged else "LOW")
         committee_gap     = knowledge_parsed.get("committee_gap") or "None"
 
-        log.info("p09_done", contacts=len(merged), confidence=confidence,
-                 primary=primary, from_search=len(search_people),
-                 from_knowledge=len(knowledge_people))
+        log.info(f"     {len(merged)} decision-makers identified · Primary: {primary} · Confidence: {confidence}")
 
         return {
             "buying_committee":     merged,
