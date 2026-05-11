@@ -239,7 +239,6 @@ function updateAnalysisView(data) {
       setPipeState(p.id, 'done', finding || 'Complete');
     } else if (isRun) {
       setPipeState(p.id, 'running', 'scanning…');
-      $(`pi-${p.id}-status`).textContent = 'scanning…';
     }
   });
 }
@@ -294,16 +293,19 @@ async function loadReport(runId) {
     const data = await res.json();
     currentReport = data;
     currentRunId  = runId;
+    showSection('results');   // show section first so all elements are live in DOM
     renderReport(data);
-    showSection('results');
     resetSubmitBtn();
   } catch (err) {
+    console.error('loadReport error:', err);
     toast(`Could not load report: ${err.message}`, 5000);
   }
 }
 window.loadReport = loadReport;
 
 function renderReport(data) {
+  if (!data) { console.error('renderReport: data is null'); return; }
+
   const pipes = data.pipelines || {};
   const pout  = key => (pipes[key] || {}).output || {};
 
@@ -321,31 +323,37 @@ function renderReport(data) {
   const p12 = pout('p12_tracking');
 
   /* ── Results header ── */
-  $('rhCompany').textContent = data.company_name || '—';
-  const elapsed = data.total_elapsed ? ` · ${data.total_elapsed.toFixed(1)}s` : '';
-  $('rhMeta').textContent = `${data.run_id || ''} · ${data.category || ''}${elapsed}`;
+  const rhCompany = $('rhCompany');
+  if (rhCompany) rhCompany.textContent = data.company_name || '—';
 
-  const v  = p08.overall_verdict || '';
+  const elapsed = data.total_elapsed != null
+    ? ` · ${Number(data.total_elapsed).toFixed(1)}s` : '';
+  const rhMeta = $('rhMeta');
+  if (rhMeta) rhMeta.textContent = `${data.run_id || ''} · ${data.category || ''}${elapsed}`;
+
+  const v   = p08.overall_verdict || '';
   const vEl = $('rhVerdict');
-  if (v && vEl) {
-    vEl.className = `rh-verdict ${v}`;
-    vEl.textContent = v;
-  }
+  if (v && vEl) { vEl.className = `rh-verdict ${v}`; vEl.textContent = v; }
 
-  /* ── All cards ── */
-  renderCompanyCard(p01);
-  renderWatchoutsCard(p08);
-  renderReputationCard(p07);
-  renderTimingCard(p08);
-  renderColorsCard(p02);
-  renderVoiceCard(p02);
-  renderCompetitorsCard(p04);
-  renderPositionCard(p03);
-  renderActivityCard(p05);
-  renderEventsCard(p06);
-  renderPeopleCard(p09, p10);
-  renderOutreachSection(p11, p09);
-  renderTrackingCard(p12);
+  /* ── All cards — each isolated so one failure never blocks the others ── */
+  const _safe = (fn, label) => {
+    try { fn(); }
+    catch (e) { console.warn(`renderReport: ${label} failed —`, e.message); }
+  };
+
+  _safe(() => renderCompanyCard(p01),          'company');
+  _safe(() => renderWatchoutsCard(p08),         'watchouts');
+  _safe(() => renderReputationCard(p07),        'reputation');
+  _safe(() => renderTimingCard(p08),            'timing');
+  _safe(() => renderColorsCard(p02),            'colors');
+  _safe(() => renderVoiceCard(p02),             'voice');
+  _safe(() => renderCompetitorsCard(p04),       'competitors');
+  _safe(() => renderPositionCard(p03),          'position');
+  _safe(() => renderActivityCard(p05),          'activity');
+  _safe(() => renderEventsCard(p06),            'events');
+  _safe(() => renderPeopleCard(p09, p10),       'people');
+  _safe(() => renderOutreachSection(p11, p09),  'outreach');
+  _safe(() => renderTrackingCard(p12),          'tracking');
 }
 
 /* ════════════════════════════════════════════════════════
@@ -400,9 +408,10 @@ function renderIcpCard(d, p06) {
 
 /* Company Overview */
 function renderCompanyCard(d) {
+  const el = $('card-company'); if (!el) return;
   const readiness = d.experiential_readiness || '';
   const readCls   = verdictCls(readiness) === 'g' ? 'green' : verdictCls(readiness) === 'r' ? 'red' : 'amber';
-  $('card-company').innerHTML = `
+  el.innerHTML = `
     <div class="card-head"><span class="card-title">Company Overview</span>
       ${readiness ? `<span class="badge ${readCls}">${esc(readiness)} Readiness</span>` : ''}
     </div>
@@ -421,9 +430,10 @@ function renderCompanyCard(d) {
 
 /* Strategic Watchouts */
 function renderWatchoutsCard(d) {
+  const el = $('card-watchouts'); if (!el) return;
   const v   = d.overall_verdict || '';
   const cls = v === 'GREEN' ? 'green' : v === 'RED' ? 'red' : 'amber';
-  $('card-watchouts').innerHTML = `
+  el.innerHTML = `
     <div class="card-head"><span class="card-title">Strategic Watchouts</span>
       ${v ? `<span class="badge ${cls}">${v}</span>` : ''}
     </div>
@@ -438,9 +448,10 @@ function renderWatchoutsCard(d) {
 
 /* Reputation */
 function renderReputationCard(d) {
+  const el = $('card-reputation'); if (!el) return;
   const lc  = verdictCls(d.reputation_label);
   const lcl = lc === 'g' ? 'green' : lc === 'r' ? 'red' : lc === 'a' ? 'amber' : '';
-  $('card-reputation').innerHTML = `
+  el.innerHTML = `
     <div class="card-head"><span class="card-title">Reputation</span>
       ${d.reputation_label ? `<span class="badge ${lcl}">${esc(d.reputation_label)}</span>` : ''}
     </div>
@@ -456,7 +467,8 @@ function renderReputationCard(d) {
 
 /* Pitch Timing */
 function renderTimingCard(d) {
-  $('card-timing').innerHTML = `
+  const el = $('card-timing'); if (!el) return;
+  el.innerHTML = `
     <div class="card-head"><span class="card-title">Pitch Timing Intelligence</span></div>
     <div class="card-body">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
@@ -480,10 +492,11 @@ function renderTimingCard(d) {
 
 /* Brand Colours */
 function renderColorsCard(d) {
+  const el = $('card-colors'); if (!el) return;
   const colors   = d.primary_colors || d.extracted_colors || [];
   const swatches = colors.slice(0, 12).map(c =>
     `<div class="swatch" style="background:${esc(c)}" title="${esc(c)}"></div>`).join('');
-  $('card-colors').innerHTML = `
+  el.innerHTML = `
     <div class="card-head"><span class="card-title">Brand Colours</span></div>
     <div class="card-body">
       ${swatches ? `<div class="swatch-row">${swatches}</div>` : ''}
@@ -499,9 +512,10 @@ function renderColorsCard(d) {
 
 /* Brand Voice */
 function renderVoiceCard(d) {
+  const el = $('card-voice'); if (!el) return;
   const kw    = d.brand_voice_keywords || [];
   const fonts = d.primary_fonts || d.extracted_fonts || [];
-  $('card-voice').innerHTML = `
+  el.innerHTML = `
     <div class="card-head"><span class="card-title">Brand Voice & Typography</span></div>
     <div class="card-body">
       ${kv('Primary Font', fonts[0] || null)}
@@ -515,6 +529,7 @@ function renderVoiceCard(d) {
 
 /* Competitors */
 function renderCompetitorsCard(d) {
+  const el = $('card-competitors'); if (!el) return;
   const comps = d.competitors || [];
   const rows  = comps.slice(0, 5).map(c => `
     <tr>
@@ -524,7 +539,7 @@ function renderCompetitorsCard(d) {
       <td style="color:var(--text-3);font-size:11px">${esc(c.experiential_gap || '—')}</td>
       <td>${badge(c.threat_level_to_brand, c.threat_level_to_brand === 'HIGH' ? 'red' : c.threat_level_to_brand === 'LOW' ? 'green' : 'amber')}</td>
     </tr>`).join('');
-  $('card-competitors').innerHTML = `
+  el.innerHTML = `
     <div class="card-head"><span class="card-title">Competitor Mapping</span>
       ${d.competitive_urgency === 'YES' ? `<span class="badge red">⚡ Competitor active</span>` : ''}
     </div>
@@ -538,7 +553,8 @@ function renderCompetitorsCard(d) {
 
 /* Market Position */
 function renderPositionCard(d) {
-  $('card-position').innerHTML = `
+  const el = $('card-position'); if (!el) return;
+  el.innerHTML = `
     <div class="card-head"><span class="card-title">Market Position</span></div>
     <div class="card-body">
       ${kv('Share of Voice', d.share_of_voice_level, verdictCls(d.share_of_voice_level))}
@@ -552,8 +568,9 @@ function renderPositionCard(d) {
 
 /* Brand Activity */
 function renderActivityCard(d) {
+  const el = $('card-activity'); if (!el) return;
   const campaigns = d.recent_campaigns || [];
-  $('card-activity').innerHTML = `
+  el.innerHTML = `
     <div class="card-head"><span class="card-title">Brand Activity</span>
       ${d.budget_signal ? `<span class="badge ${d.budget_signal === 'HIGH' ? 'green' : d.budget_signal === 'LOW' ? 'red' : 'amber'}">${esc(d.budget_signal)} budget</span>` : ''}
     </div>
@@ -580,6 +597,7 @@ function renderActivityCard(d) {
 
 /* Events */
 function renderEventsCard(d) {
+  const el = $('card-events'); if (!el) return;
   const events = d.events_timeline || [];
   const score  = d.experiential_maturity_score;
   const pct    = score ? (score / 5) * 100 : 0;
@@ -644,7 +662,7 @@ function renderEventsCard(d) {
         ? `<div style="margin-top:6px;font-size:11px;color:var(--text-3)">${esc(ev.source.slice(0,100))}</div>` : ''}
     </div>`).join('');
 
-  $('card-events').innerHTML = `
+  el.innerHTML = `
     <div class="card-head">
       <span class="card-title">Experiential Footprint</span>
       ${score ? `<span style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--green)">${score}<span style="font-size:12px;color:var(--text-3)">/5</span></span>` : ''}
@@ -673,6 +691,7 @@ function renderEventsCard(d) {
 
 /* People */
 function renderPeopleCard(p09, p10) {
+  const el = $('card-people'); if (!el) return;
   const people   = p09.buying_committee || [];
   const contacts = p10.contacts || [];
   const cmap     = {};
@@ -702,7 +721,7 @@ function renderPeopleCard(p09, p10) {
     </div>`;
   }).join('');
 
-  $('card-people').innerHTML = `
+  el.innerHTML = `
     <div class="card-head"><span class="card-title">Decision Makers & Contact Intelligence</span>
       ${people.length ? `<span class="badge indigo">${people.length} stakeholder${people.length !== 1 ? 's' : ''}</span>` : ''}
     </div>
@@ -884,6 +903,7 @@ window.selectContact = function(idx) {
 
 /* Tracking — Excel-like table with status management */
 function renderTrackingCard(d) {
+  const el = $('card-tracking'); if (!el) return;
   const pipes = currentReport?.pipelines || {};
   const p11   = (pipes.p11_outreach || {}).output || {};
   const p09   = (pipes.p09_decision_makers || {}).output || {};
@@ -959,7 +979,7 @@ function renderTrackingCard(d) {
   const nPend = contacts.filter(c => statuses[c.name] === 'pending').length;
   const nDone = contacts.filter(c => statuses[c.name] === 'completed').length;
 
-  $('card-tracking').innerHTML = `
+  el.innerHTML = `
     <div class="card-head">
       <span class="card-title">Outreach Tracker</span>
       <button class="btn-ghost" onclick="exportTrackCSV()" style="font-size:12px;padding:5px 10px">↓ CSV</button>
