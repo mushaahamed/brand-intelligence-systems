@@ -294,17 +294,19 @@ frontend_path = Path(__file__).parent.parent / "frontend"
 if frontend_path.exists():
     app.mount("/static", StaticFiles(directory=str(frontend_path)), name="static")
 
+    NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}
+
     @app.get("/")
     async def serve_frontend():
-        return FileResponse(str(frontend_path / "index.html"))
+        return FileResponse(str(frontend_path / "index.html"), headers=NO_CACHE)
 
     @app.get("/style.css")
     async def serve_css():
-        return FileResponse(str(frontend_path / "style.css"), media_type="text/css")
+        return FileResponse(str(frontend_path / "style.css"), media_type="text/css", headers=NO_CACHE)
 
     @app.get("/app.js")
     async def serve_js():
-        return FileResponse(str(frontend_path / "app.js"), media_type="application/javascript")
+        return FileResponse(str(frontend_path / "app.js"), media_type="application/javascript", headers=NO_CACHE)
 
 
 if __name__ == "__main__":
