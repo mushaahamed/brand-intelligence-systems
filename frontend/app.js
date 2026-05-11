@@ -38,6 +38,7 @@ const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 
 function toast(msg, ms = 3000) {
   const el = $('toast');
+  if (!el) { console.warn('toast:', msg); return; }
   el.textContent = msg;
   el.classList.remove('hidden');
   clearTimeout(el._t);
@@ -140,8 +141,10 @@ function startAnalysis(jid, companyName) {
   addStreamEntry('system', 'info', `Initialising analysis for "${companyName}"`);
   addStreamEntry('system', 'info', `Job ID: ${jid} · 12 intelligence pipelines queued`);
 
-  $('analysisTitle').textContent  = `Analysing ${companyName}`;
-  $('analysisSubtitle').textContent = 'Connecting to intelligence pipelines…';
+  const titleEl = $('analysisTitle');
+  if (titleEl) titleEl.textContent = `Analysing ${companyName}`;
+  const subtitleEl = $('analysisSubtitle');
+  if (subtitleEl) subtitleEl.textContent = 'Connecting to intelligence pipelines…';
 
   pollTimer = setInterval(doPoll, POLL);
 }
@@ -185,11 +188,11 @@ async function doPoll() {
       if (data.status === 'complete') {
         addStreamEntry('system', 'complete', `Analysis complete · ${data.elapsed?.toFixed(1) || '?'}s · all 12 pipelines`);
         PIPELINES.forEach(p => setPipeState(p.id, 'done', ''));
-        $('ppBar').style.width  = '100%';
-        $('ppPct').textContent  = '100%';
-        $('ppStats').textContent = '12 / 12 pipelines complete';
-        $('analysisPhase').textContent     = 'Complete';
-        $('analysisSubtitle').textContent  = 'All pipelines finished — loading results…';
+        const pb = $('ppBar'); if (pb) pb.style.width = '100%';
+        const pc = $('ppPct'); if (pc) pc.textContent = '100%';
+        const ps = $('ppStats'); if (ps) ps.textContent = '12 / 12 pipelines complete';
+        const ap = $('analysisPhase'); if (ap) ap.textContent = 'Complete';
+        const as2 = $('analysisSubtitle'); if (as2) as2.textContent = 'All pipelines finished — loading results…';
         setTimeout(() => { if (data.run_id) loadReport(data.run_id); }, 700);
       } else {
         addStreamEntry('system', 'error', `Analysis failed — ${data.error || 'unknown error'}`);
@@ -207,13 +210,13 @@ function updateAnalysisView(data) {
   const logEntries = data.pipeline_log      || [];
   const pct = Math.min(95, Math.round((done.length / 12) * 100));
 
-  $('ppBar').style.width  = `${pct}%`;
-  $('ppPct').textContent  = `${pct}%`;
-  $('ppStats').textContent = `${done.length} / 12 pipelines complete`;
+  const pb2 = $('ppBar'); if (pb2) pb2.style.width = `${pct}%`;
+  const pc2 = $('ppPct'); if (pc2) pc2.textContent = `${pct}%`;
+  const ps2 = $('ppStats'); if (ps2) ps2.textContent = `${done.length} / 12 pipelines complete`;
 
   // Phase indicator
   const phase = done.length < 9 ? 'Phase 1 — Parallel Research' : 'Phase 2 — Sequential Synthesis';
-  $('analysisPhase').textContent = phase;
+  const ap2 = $('analysisPhase'); if (ap2) ap2.textContent = phase;
 
   // Render new log entries
   if (logEntries.length > logCount) {
