@@ -59,8 +59,7 @@ Layer 2 — extract()
   Still no LLM.
 
 Layer 3 — synthesise()
-  The structured dict is formatted into a prompt and sent to the LLM
-  (GPT-4o-mini for most pipelines, GPT-4o for outreach writing only).
+  The structured dict is formatted into a prompt and sent to an LLM.
   The model returns a defined JSON schema. The output is parsed and
   validated before being returned.
 ```
@@ -68,7 +67,7 @@ Layer 3 — synthesise()
 **Example — P01 Company Overview:**
 - `fetch()` crawls up to 4 pages of the company website via direct HTTP + BeautifulSoup, then runs two parallel Google searches via Apify for funding, team size, and news signals
 - `extract()` prioritises "about", "team", "investor", and "press" pages, assembles up to 6 text chunks (800 chars each), and collects news snippets
-- `synthesise()` sends the structured text to GPT-4o-mini with a system prompt that returns `business_model`, `industry_vertical`, `employee_count_range`, `funding_status`, `icp_fit_score`, `experiential_readiness`, and `company_narrative`
+- `synthesise()` sends the structured text with a system prompt that returns `business_model`, `industry_vertical`, `employee_count_range`, `funding_status`, `icp_fit_score`, `experiential_readiness`, and `company_narrative`
 
 ### System Diagram
 
@@ -111,7 +110,7 @@ Layer 3 — synthesise()
 
 **Extract:** Selects and truncates the most relevant page sections. Collects up to 10 news snippets with titles and descriptions.
 
-**Synthesise (GPT-4o-mini):** Returns `business_model`, `industry_vertical`, `employee_count_range`, `funding_status`, `key_facts[]`, `company_narrative`, `recommended_service`, `icp_fit_score` (0–100), and `experiential_readiness` (LOW / MEDIUM / HIGH).
+**Synthesise:** Returns `business_model`, `industry_vertical`, `employee_count_range`, `funding_status`, `key_facts[]`, `company_narrative`, `recommended_service`, `icp_fit_score` (0–100), and `experiential_readiness` (LOW / MEDIUM / HIGH).
 
 **ICP Score Calculation:**
 | Signal | Points |
@@ -129,7 +128,7 @@ Layer 3 — synthesise()
 
 **Extract:** Regex-parses all CSS and inline HTML for hex colours (`#rrggbb`) and RGB values, counting frequency of each. Filters near-white and near-black values. Extracts `font-family` declarations. Collects homepage copy for tone analysis.
 
-**Synthesise (GPT-4o-mini):** Returns `primary_colors[]` (top hex values by frequency), `secondary_colors[]`, `primary_fonts[]`, `brand_tone`, `brand_voice_keywords[]`, `brand_maturity`, `missing_brand_elements[]`, and `experiential_design_angle` — a note on how brand identity should inform activation design.
+**Synthesise:** Returns `primary_colors[]` (top hex values by frequency), `secondary_colors[]`, `primary_fonts[]`, `brand_tone`, `brand_voice_keywords[]`, `brand_maturity`, `missing_brand_elements[]`, and `experiential_design_angle` — a note on how brand identity should inform activation design.
 
 **Key differentiator:** Colors are extracted from actual CSS files, not inferred from images or brand guidelines.
 
@@ -141,7 +140,7 @@ Layer 3 — synthesise()
 
 **Extract:** Filters for results containing sentiment keywords. Collects titles, snippets, and publication dates.
 
-**Synthesise (GPT-4o-mini):** Returns `brand_sentiment` (POSITIVE / NEUTRAL / NEGATIVE / MIXED), `share_of_voice_level` (DOMINANT / HIGH / MEDIUM / LOW / NICHE), `perception_gap_score` (1–5), `search_visibility`, `pitch_implication`, and `recommended_positioning` for the agency pitch.
+**Synthesise:** Returns `brand_sentiment` (POSITIVE / NEUTRAL / NEGATIVE / MIXED), `share_of_voice_level` (DOMINANT / HIGH / MEDIUM / LOW / NICHE), `perception_gap_score` (1–5), `search_visibility`, `pitch_implication`, and `recommended_positioning` for the agency pitch.
 
 ---
 
@@ -151,7 +150,7 @@ Layer 3 — synthesise()
 
 **Extract:** Identifies 4–6 competitor names and basic positioning from search results.
 
-**Synthesise (GPT-4o-mini):** For each competitor, returns `name`, `brand_positioning`, `events_activity` (ACTIVE / OCCASIONAL / NONE), `events_description`, and `experiential_gap`. At the map level: `experiential_white_space` (the gap none of them are filling), `competitive_urgency` (YES / NO), and `recommended_pitch_angle`.
+**Synthesise:** For each competitor, returns `name`, `brand_positioning`, `events_activity` (ACTIVE / OCCASIONAL / NONE), `events_description`, and `experiential_gap`. At the map level: `experiential_white_space` (the gap none of them are filling), `competitive_urgency` (YES / NO), and `recommended_pitch_angle`.
 
 ---
 
@@ -161,7 +160,7 @@ Layer 3 — synthesise()
 
 **Extract:** Filters for campaign and marketing keywords. Extracts dated signals.
 
-**Synthesise (GPT-4o-mini):** Returns `recent_campaigns[]` (each with name, date, channel, description, estimated reach), `budget_signal` (ENTERPRISE / MID-MARKET / STARTER / UNKNOWN), `last_major_campaign`, `campaign_frequency`, `digital_vs_experiential_ratio`, and `upcoming_opportunity_window` — a forward-looking note on timing for an agency pitch.
+**Synthesise:** Returns `recent_campaigns[]` (each with name, date, channel, description, estimated reach), `budget_signal` (ENTERPRISE / MID-MARKET / STARTER / UNKNOWN), `last_major_campaign`, `campaign_frequency`, `digital_vs_experiential_ratio`, and `upcoming_opportunity_window` — a forward-looking note on timing for an agency pitch.
 
 ---
 
@@ -171,7 +170,7 @@ Layer 3 — synthesise()
 
 **Extract:** Filters results against 30+ event-related keywords. If the strict filter finds nothing, all results are passed to the LLM with an instruction to infer from training knowledge.
 
-**Synthesise (GPT-4o-mini):** Returns a full `events_timeline[]` — each entry has `event_name`, `date`, `format` (Conference / Product launch / Consumer activation / Sponsorship / Pop-up / Roadshow / Award / CSR), `scale` (Intimate / Mid / Large / Mass), `location`, `brand_role` (Host / Sponsor / Participant), and `production_quality`. At the summary level: `experiential_maturity_score` (1–5), `formats_used[]`, `formats_missing[]`, `events_frequency`, `pitch_angle`, and `opening_line_for_pitch` — a ready-to-use first sentence for the outreach email referencing a real gap or event.
+**Synthesise:** Returns a full `events_timeline[]` — each entry has `event_name`, `date`, `format` (Conference / Product launch / Consumer activation / Sponsorship / Pop-up / Roadshow / Award / CSR), `scale` (Intimate / Mid / Large / Mass), `location`, `brand_role` (Host / Sponsor / Participant), and `production_quality`. At the summary level: `experiential_maturity_score` (1–5), `formats_used[]`, `formats_missing[]`, `events_frequency`, `pitch_angle`, and `opening_line_for_pitch` — a ready-to-use first sentence for the outreach email referencing a real gap or event.
 
 ---
 
@@ -181,7 +180,7 @@ Layer 3 — synthesise()
 
 **Extract:** Formats Reddit posts with subreddit, upvote score, title, and body (truncated to 200 chars). Collects review snippets.
 
-**Synthesise (GPT-4o-mini):** Returns `overall_reputation_score` (0–100), `reputation_label` (STRONG / GOOD / NEUTRAL / MIXED / POOR), `reddit_sentiment`, `reddit_key_themes[]`, `reddit_top_complaints[]`, `reddit_top_praise[]`, `nps_signal`, `brand_community_strength`, `recent_controversy`, `reputation_watchout` (what the agency must know before pitching), and `reputation_opportunity` (a positive signal to reference in outreach).
+**Synthesise:** Returns `overall_reputation_score` (0–100), `reputation_label` (STRONG / GOOD / NEUTRAL / MIXED / POOR), `reddit_sentiment`, `reddit_key_themes[]`, `reddit_top_complaints[]`, `reddit_top_praise[]`, `nps_signal`, `brand_community_strength`, `recent_controversy`, `reputation_watchout` (what the agency must know before pitching), and `reputation_opportunity` (a positive signal to reference in outreach).
 
 **Key differentiator:** Reddit is the primary signal source — authentic, unmoderated consumer opinion rather than brand-managed review platforms.
 
@@ -193,7 +192,7 @@ Layer 3 — synthesise()
 
 **Extract:** Assembles dated signals with titles and snippets.
 
-**Synthesise (GPT-4o-mini):** Returns `overall_verdict` (GREEN / AMBER / RED), `verdict_reasoning`, `financial_distress_signals[]`, `leadership_changes[]` (each with role, change description, date, and implication for vendor timing), `pr_controversies[]`, `marketing_freeze_detected` (boolean), `existing_agency_signals[]`, `timing_recommendation` (PURSUE NOW / WAIT 30 DAYS / WAIT 60 DAYS / AVOID), and `pitch_tone_adjustment` — explicit guidance on how the agent should calibrate their approach.
+**Synthesise:** Returns `overall_verdict` (GREEN / AMBER / RED), `verdict_reasoning`, `financial_distress_signals[]`, `leadership_changes[]` (each with role, change description, date, and implication for vendor timing), `pr_controversies[]`, `marketing_freeze_detected` (boolean), `existing_agency_signals[]`, `timing_recommendation` (PURSUE NOW / WAIT 30 DAYS / WAIT 60 DAYS / AVOID), and `pitch_tone_adjustment` — explicit guidance on how the agent should calibrate their approach.
 
 **P11 reads this verdict and adjusts outreach tone accordingly:** GREEN = confident, AMBER = measured, RED = do not pitch hard.
 
@@ -201,11 +200,11 @@ Layer 3 — synthesise()
 
 ### P09 — Decision-Maker Identification
 
-**Fetch:** Two Google searches with quoted company name targeting CMO, VP Marketing, Head of Marketing, Head of Brand, Events Manager, and Marketing Director LinkedIn profiles.
+**Fetch:** Four parallel Google searches targeting LinkedIn profiles of CMOs, VPs, Heads of Marketing, Brand Managers, and Events Managers. Also scrapes the company's team or about page.
 
-**Extract:** Parses LinkedIn-format titles from search result titles (e.g. "First Last - Title at Company | LinkedIn"). Extracts name, role, LinkedIn URL, and snippet. Deduplicates by name.
+**Extract:** Collects all raw search text without filtering. Builds a LinkedIn URL map from any profile links found in results.
 
-**Synthesise (GPT-4o-mini):** Returns a `buying_committee[]` — each person has `name`, `title`, `role_type` (Economic Buyer / Initiator / Events Specialist / Influencer), `company_tenure_months`, `linkedin_url`, `linkedin_activity` (ACTIVE / MODERATE / DORMANT / UNKNOWN), `decision_relevance_score` (1–5), `outreach_priority` (PRIMARY / SECONDARY / AVOID), and `personalisation_hook` — a specific sentence about this person to reference in outreach.
+**Synthesise:** Returns a `buying_committee[]` — each person has `name`, `title`, `role_type` (Economic Buyer / Initiator / Events Specialist / Influencer), `linkedin_url`, `decision_relevance_score` (1–5), `outreach_priority` (PRIMARY / SECONDARY), and `personalisation_hook` — a specific sentence about this person to reference in outreach.
 
 ---
 
@@ -225,7 +224,7 @@ Layer 3 — synthesise()
 
 **Extract:** Assembles a rich structured brief: contact details from P09 + P10, competitor intel from P04, last campaign from P05, experiential footprint and pitch angle from P06, watchout verdict from P08, reputation opportunity from P07, and ICP score from P01.
 
-**Synthesise (GPT-4o):** Writes a 4-touch sequence for the primary contact. The model is instructed to write as a senior outreach specialist who has spent two hours researching this exact brand.
+**Synthesise:** Writes a 4-touch sequence for the primary contact. The model is instructed to write as a senior outreach specialist who has spent two hours researching this exact brand.
 
 Touch structure:
 | Touch | Channel | Timing | Content |
@@ -362,7 +361,7 @@ SMOKE=1 python -m pytest tests/test_apis.py::TestSmoke -v
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `OPENAI_API_KEY` | Yes | OpenAI API key — used for all LLM synthesis |
+| `OPENAI_API_KEY` | Yes | API key for LLM synthesis across all pipelines |
 | `APIFY_TOKEN_1` | Yes | Apify token for P01 (Company Overview) and P02 (Brand Identity) |
 | `APIFY_TOKEN_2` | No | Apify token for P03 (Market Position) and P04 (Competitor Mapping) |
 | `APIFY_TOKEN_3` | No | Apify token for P05 (Brand Activity) and P06 (Experiential Footprint) |
@@ -558,7 +557,7 @@ brand-intelligence-system/
 │   └── p12_tracking/
 ├── utils/
 │   ├── apify_client.py      # Actor runner with token rotation and retry logic
-│   ├── claude_client.py     # OpenAI wrapper (GPT-4o-mini / GPT-4o)
+│   ├── claude_client.py     # LLM client wrapper for all synthesis calls
 │   ├── hunter_client.py     # Email finder and domain pattern lookup
 │   ├── web_scraper.py       # Direct HTTP crawl with BeautifulSoup
 │   └── helpers.py           # ICP scoring, text utilities, JSON parsing
