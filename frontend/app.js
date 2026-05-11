@@ -360,37 +360,38 @@ function renderReport(data) {
    CARD RENDERERS
 ════════════════════════════════════════════════════════ */
 
-/* ICP Gauge */
+/* ICP Score Card */
 function renderIcpCard(d) {
-  const score = d.icp_fit_score ?? 0;
-  const color  = score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--amber)' : 'var(--red)';
-  const colorHex = score >= 70 ? '#10B981' : score >= 40 ? '#F59E0B' : '#EF4444';
-  const pct   = score;
-  const r     = 44;
-  const cx    = 60; const cy = 64;
-  const circ  = Math.PI * r;
-  const offset = circ * (1 - pct / 100);
-
+  const score     = d.icp_fit_score ?? 0;
+  const colorHex  = score >= 70 ? '#10B981' : score >= 40 ? '#F59E0B' : '#EF4444';
+  const label     = score >= 70 ? 'HIGH FIT' : score >= 40 ? 'MEDIUM FIT' : 'LOW FIT';
   const readiness = d.experiential_readiness || '';
-  const readCls   = verdictCls(readiness) === 'g' ? 'green' : verdictCls(readiness) === 'r' ? 'red' : verdictCls(readiness) === 'a' ? 'amber' : '';
+  const readCls   = verdictCls(readiness) === 'g' ? 'green' : verdictCls(readiness) === 'r' ? 'red' : 'amber';
+
+  // Full-circle ring gauge
+  const r = 38, cx = 52, cy = 52;
+  const circ  = 2 * Math.PI * r;
+  const fill  = circ * (score / 100);
+  const gap   = circ - fill;
 
   $('card-icp-score').innerHTML = `
     <div class="card-head"><span class="card-title">ICP Fit</span></div>
     <div class="icp-card-body">
-      <div class="icp-gauge-wrap">
-        <svg width="120" height="72" viewBox="0 0 120 72">
-          <path d="M16,64 A44,44,0,0,1,104,64" fill="none" stroke="var(--bg-3)" stroke-width="8" stroke-linecap="round"/>
-          <path d="M16,64 A44,44,0,0,1,104,64" fill="none" stroke="${colorHex}" stroke-width="8"
-            stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" stroke-linecap="round"/>
+      <div class="icp-ring-wrap">
+        <svg width="104" height="104" viewBox="0 0 104 104">
+          <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--bg-3)" stroke-width="7"/>
+          <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${colorHex}" stroke-width="7"
+            stroke-linecap="round" stroke-dasharray="${fill.toFixed(1)} ${gap.toFixed(1)}"
+            transform="rotate(-90 ${cx} ${cy})"/>
         </svg>
-        <div class="icp-label-center">
-          <span class="icp-score-big" style="color:${color}">${score}</span>
+        <div class="icp-ring-center">
+          <span class="icp-score-big" style="color:${colorHex}">${score}</span>
           <span class="icp-score-sub">/100</span>
         </div>
       </div>
-      <div class="icp-subtitle">ICP Score</div>
-      ${readiness ? `<div class="icp-readiness badge ${readCls}">${esc(readiness)}</div>` : ''}
-      ${d.recommended_service ? `<div style="font-size:11px;color:var(--text-3);text-align:center;margin-top:6px;line-height:1.4">${esc(d.recommended_service)}</div>` : ''}
+      <div class="icp-score-label" style="color:${colorHex}">${label}</div>
+      ${readiness ? `<div class="badge ${readCls}" style="margin-top:6px">${esc(readiness)}</div>` : ''}
+      ${d.recommended_service ? `<div class="icp-service-hint">${esc(d.recommended_service)}</div>` : ''}
     </div>`;
 }
 

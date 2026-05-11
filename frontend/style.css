@@ -517,28 +517,34 @@ a:hover { color: #6EFFA0; }
 }
 .card-body { padding: 16px 20px; }
 
-/* ICP gauge card */
+/* ICP ring card */
 .icp-card-body {
   display: flex; flex-direction: column; align-items: center;
-  padding: 24px 20px; gap: 6px;
+  padding: 20px 20px 18px; gap: 4px;
 }
-.icp-gauge-wrap { position: relative; }
-.icp-label-center {
-  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -38%);
-  text-align: center;
+.icp-ring-wrap {
+  position: relative; width: 104px; height: 104px;
+}
+.icp-ring-wrap svg { display: block; }
+.icp-ring-center {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
 }
 .icp-score-big {
-  font-family: var(--mono); font-size: 32px; font-weight: 700;
-  color: var(--text); line-height: 1; display: block;
+  font-family: var(--mono); font-size: 30px; font-weight: 700;
+  line-height: 1; display: block;
 }
-.icp-score-sub { font-size: 10px; color: var(--text-3); }
-.icp-subtitle {
-  font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--text-3); text-align: center;
+.icp-score-sub {
+  font-family: var(--mono); font-size: 10px; color: var(--text-4);
+  line-height: 1; margin-top: 1px;
 }
-.icp-readiness {
-  font-size: 12px; font-weight: 600; padding: 4px 12px;
-  border-radius: 100px; margin-top: 4px;
+.icp-score-label {
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase; margin-top: 6px;
+}
+.icp-service-hint {
+  font-size: 11px; color: var(--text-3); text-align: center;
+  margin-top: 6px; line-height: 1.4; max-width: 140px;
 }
 
 /* KV rows */
