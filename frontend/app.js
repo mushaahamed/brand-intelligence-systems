@@ -375,7 +375,7 @@ function renderIcpCard(d, p06) {
   const gap   = circ - fill;
 
   // Service fit from P06
-  const svc        = (p06 || {}).steponexp_service_fit || {};
+  const svc        = (p06 || {}).agency_service_fit || {};
   const svcService = svc.primary_service || '';
   const svcOpp     = svc.opportunity_size || '';
 
@@ -587,9 +587,9 @@ function renderEventsCard(d) {
   const score  = d.experiential_maturity_score;
   const pct    = score ? (score / 5) * 100 : 0;
   const sColor = score >= 4 ? 'green' : score >= 2 ? '' : 'amber';
-  const svc    = d.steponexp_service_fit || {};
+  const svc    = d.agency_service_fit || {};
 
-  /* ── StepOneXP Service Fit banner ── */
+  /* ── Agency Service Fit banner ── */
   const oppColors = {
     'LARGE': { bg: '#D1FAE5', border: '#6EE7B7', text: '#065F46' },
     'MEDIUM': { bg: '#FEF3C7', border: '#FCD34D', text: '#92400E' },
@@ -603,7 +603,7 @@ function renderEventsCard(d) {
     <div style="margin-bottom:20px;border-radius:10px;overflow:hidden;border:1px solid #C7D2FE">
       <div style="background:#4F46E5;padding:10px 16px;display:flex;align-items:center;gap:10px">
         <span style="font-size:16px">🎯</span>
-        <span style="font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:#C7D2FE;text-transform:uppercase;font-weight:700">StepOneXP Service Fit</span>
+        <span style="font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:#C7D2FE;text-transform:uppercase;font-weight:700">Agency Service Fit</span>
       </div>
       <div style="background:#EEF2FF;padding:14px 16px;display:grid;gap:10px">
         <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap">
@@ -1412,7 +1412,7 @@ function buildPDFHTML(data) {
     </div>
 
     ${(() => {
-      const svc = p06.steponexp_service_fit || {};
+      const svc = p06.agency_service_fit || {};
       if (!svc.primary_service) return '';
       const oppBg = { LARGE: '#D1FAE5', MEDIUM: '#FEF3C7', SMALL: '#F3F4F6' };
       const oppTx = { LARGE: '#065F46', MEDIUM: '#92400E', SMALL: '#374151' };
@@ -1422,7 +1422,7 @@ function buildPDFHTML(data) {
       <div style="margin-bottom:18px;border-radius:8px;overflow:hidden;border:1px solid #C7D2FE">
         <div style="background:#4F46E5;padding:9px 14px;display:flex;align-items:center;gap:8px">
           <span style="font-size:13px">🎯</span>
-          <span style="font-size:9px;font-weight:700;letter-spacing:.12em;color:#C7D2FE;text-transform:uppercase">StepOneXP Service Fit</span>
+          <span style="font-size:9px;font-weight:700;letter-spacing:.12em;color:#C7D2FE;text-transform:uppercase">Agency Service Fit</span>
         </div>
         <div style="background:#EEF2FF;padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start">
           <div>
