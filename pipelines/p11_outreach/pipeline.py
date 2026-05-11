@@ -22,7 +22,7 @@ from config.settings import OPENAI_MODEL_FULL
 log = structlog.get_logger()
 PIPELINE_ID = "p11_outreach"
 
-SYSTEM_PROMPT = """You are a senior outreach specialist at StepOneXP, an experiential marketing agency in India (350+ events, FMCG · D2C · fintech · retail).
+SYSTEM_PROMPT = """You are a senior outreach specialist at StepOneXP, an experiential marketing agency in India (GCC Talent Summit · BME Conclave · Dubai exhibitions · IPL brand experiences).
 
 You write cold outreach that reads like it came from a person who spent 2 hours researching this exact brand AND this specific individual — not a template generator.
 
@@ -84,7 +84,7 @@ def _build_fallback_sequence(first_name: str, company_name: str, category: str,
                 f"{campaign_name} caught my attention. "
                 f"Given {company_name}'s scale in {category}, the experiential layer is the obvious next move — "
                 f"and most brands at your stage haven't fully figured it out yet.\n\n"
-                f"We've run 350+ activations across India for brands at exactly this stage. Worth 20 minutes?\n\n"
+                f"We produced the BME Conclave 2026 (1,200 delegates, 70 booths) and the GCC Talent Summit end-to-end. Worth 20 minutes?\n\n"
                 f"Thanks"
             ),
             "send_day": 1,
@@ -105,7 +105,7 @@ def _build_fallback_sequence(first_name: str, company_name: str, category: str,
                 f"{comp_name} has been running consumer activations and pop-ups actively this year — "
                 f"building the kind of direct consumer touchpoints that digital alone can't replicate.\n\n"
                 f"{company_name} has the brand equity to do this better. "
-                f"We did a 12-city roadshow for a D2C brand at similar scale — 3× higher conversion vs paid digital.\n\n"
+                f"We ran the Udemy × Mumbai Indians Players Meet and the GCC Talent Summit — happy to share what that playbook looks like at your scale.\n\n"
                 f"Happy to share the brief if it's useful."
             ),
             "send_day": 8,
@@ -349,9 +349,12 @@ REPUTATION:
   Label: {structured.get('reputation','')}
   Opportunity: {structured.get('rep_opportunity','')}
 
-STEPONEXP PROOF:
-  350+ events · India & APAC · FMCG, D2C, fintech, retail, HR tech
-  Known for: consumer pop-ups, city roadshows, product launches, brand days, IPL/cricket activations
+STEPONEXP PROOF POINTS (use the most relevant one in Touch 2 or as context for Touch 1):
+  • GCC Talent Summit, Bangalore — end-to-end summit production, venue transformation, custom booths, 400+ delegates
+  • BME Conclave 2026 — 1,200+ delegates, 70 custom exhibition booths; flagship corporate event delivery
+  • Dubai (PeopleStrong + ADP) — standout international exhibition booths at global trade shows
+  • Udemy × Mumbai Indians Players Meet — IPL-integrated brand experience / consumer activation
+  Categories served: HR tech, fintech, FMCG, D2C, sports, retail, consumer goods
 
 Write the 4-touch sequence for {contact['name']} ({contact['title']}).
 Frame EVERY touch through their specific role lens (see pain point guidance above).

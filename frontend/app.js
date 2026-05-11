@@ -340,7 +340,7 @@ function renderReport(data) {
   }
 
   /* ── All cards ── */
-  renderIcpCard(p01);
+  renderIcpCard(p01, p06);
   renderCompanyCard(p01);
   renderWatchoutsCard(p08);
   renderReputationCard(p07);
@@ -361,7 +361,7 @@ function renderReport(data) {
 ════════════════════════════════════════════════════════ */
 
 /* ICP Score Card */
-function renderIcpCard(d) {
+function renderIcpCard(d, p06) {
   const score     = d.icp_fit_score ?? 0;
   const colorHex  = score >= 70 ? '#10B981' : score >= 40 ? '#F59E0B' : '#EF4444';
   const label     = score >= 70 ? 'HIGH FIT' : score >= 40 ? 'MEDIUM FIT' : 'LOW FIT';
@@ -373,6 +373,11 @@ function renderIcpCard(d) {
   const circ  = 2 * Math.PI * r;
   const fill  = circ * (score / 100);
   const gap   = circ - fill;
+
+  // Service fit from P06
+  const svc        = (p06 || {}).steponexp_service_fit || {};
+  const svcService = svc.primary_service || '';
+  const svcOpp     = svc.opportunity_size || '';
 
   $('card-icp-score').innerHTML = `
     <div class="card-head"><span class="card-title">ICP Fit</span></div>
@@ -392,6 +397,12 @@ function renderIcpCard(d) {
       <div class="icp-score-label" style="color:${colorHex}">${label}</div>
       ${readiness ? `<div class="badge ${readCls}" style="margin-top:6px">${esc(readiness)}</div>` : ''}
       ${d.recommended_service ? `<div class="icp-service-hint">${esc(d.recommended_service)}</div>` : ''}
+      ${svcService ? `
+      <div style="margin-top:10px;padding:8px 10px;background:rgba(79,70,229,0.12);border:1px solid rgba(99,102,241,0.3);border-radius:6px;text-align:center">
+        <div style="font-family:var(--mono);font-size:8px;color:#818CF8;letter-spacing:.1em;text-transform:uppercase;margin-bottom:3px">Service Fit</div>
+        <div style="font-size:11px;font-weight:600;color:#C7D2FE;line-height:1.3">${esc(svcService)}</div>
+        ${svcOpp ? `<div style="margin-top:4px;font-size:9px;color:#A5B4FC">${esc(svcOpp.split('(')[0].trim())}</div>` : ''}
+      </div>` : ''}
     </div>`;
 }
 
@@ -576,6 +587,48 @@ function renderEventsCard(d) {
   const score  = d.experiential_maturity_score;
   const pct    = score ? (score / 5) * 100 : 0;
   const sColor = score >= 4 ? 'green' : score >= 2 ? '' : 'amber';
+  const svc    = d.steponexp_service_fit || {};
+
+  /* ── StepOneXP Service Fit banner ── */
+  const oppColors = {
+    'LARGE': { bg: '#D1FAE5', border: '#6EE7B7', text: '#065F46' },
+    'MEDIUM': { bg: '#FEF3C7', border: '#FCD34D', text: '#92400E' },
+    'SMALL': { bg: '#F3F4F6', border: '#D1D5DB', text: '#374151' },
+  };
+  const oppKey    = (svc.opportunity_size || '').split(' ')[0].toUpperCase();
+  const oppStyle  = oppColors[oppKey] || oppColors['MEDIUM'];
+
+  /* Proof reference colour (indigo) */
+  const serviceFitBlock = svc.primary_service ? `
+    <div style="margin-bottom:20px;border-radius:10px;overflow:hidden;border:1px solid #C7D2FE">
+      <div style="background:#4F46E5;padding:10px 16px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:16px">🎯</span>
+        <span style="font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:#C7D2FE;text-transform:uppercase;font-weight:700">StepOneXP Service Fit</span>
+      </div>
+      <div style="background:#EEF2FF;padding:14px 16px;display:grid;gap:10px">
+        <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap">
+          <div style="flex:1;min-width:180px">
+            <div style="font-family:var(--mono);font-size:9px;color:#6366F1;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Primary Service</div>
+            <div style="font-size:14px;font-weight:700;color:#1E1B4B">${esc(svc.primary_service)}</div>
+          </div>
+          ${svc.opportunity_size ? `
+          <div style="background:${oppStyle.bg};border:1px solid ${oppStyle.border};border-radius:6px;padding:6px 12px;align-self:flex-start">
+            <div style="font-family:var(--mono);font-size:9px;color:${oppStyle.text};letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px">Opportunity</div>
+            <div style="font-size:13px;font-weight:700;color:${oppStyle.text}">${esc(svc.opportunity_size)}</div>
+          </div>` : ''}
+        </div>
+        ${svc.pitch_reference ? `
+        <div style="background:#fff;border-radius:6px;border:1px solid #C7D2FE;padding:10px 12px">
+          <div style="font-family:var(--mono);font-size:9px;color:#6366F1;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Reference in Outreach</div>
+          <div style="font-size:12px;color:#1E1B4B">📌 ${esc(svc.pitch_reference)}</div>
+        </div>` : ''}
+        ${svc.first_event_possible ? `
+        <div style="background:#fff;border-radius:6px;border:1px solid #C7D2FE;padding:10px 12px">
+          <div style="font-family:var(--mono);font-size:9px;color:#6366F1;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">First Win Possible</div>
+          <div style="font-size:12px;color:#1E1B4B">🚀 ${esc(svc.first_event_possible)}</div>
+        </div>` : ''}
+      </div>
+    </div>` : '';
 
   const eventCards = events.slice(0, 8).map(ev => `
     <div class="event-card">
@@ -600,6 +653,7 @@ function renderEventsCard(d) {
       ${score ? `<span style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--green)">${score}<span style="font-size:12px;color:var(--text-3)">/5</span></span>` : ''}
     </div>
     <div class="card-body">
+      ${serviceFitBlock}
       <div style="margin-bottom:16px">
         <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--text-3);margin-bottom:5px">
           <span>MATURITY SCORE</span><span>${score || '?'}/5</span>
@@ -1356,6 +1410,35 @@ function buildPDFHTML(data) {
         ${p06.pitch_angle ? highlight(p06.pitch_angle, '#059669') : ''}
       </div>
     </div>
+
+    ${(() => {
+      const svc = p06.steponexp_service_fit || {};
+      if (!svc.primary_service) return '';
+      const oppBg = { LARGE: '#D1FAE5', MEDIUM: '#FEF3C7', SMALL: '#F3F4F6' };
+      const oppTx = { LARGE: '#065F46', MEDIUM: '#92400E', SMALL: '#374151' };
+      const oppBd = { LARGE: '#6EE7B7', MEDIUM: '#FCD34D', SMALL: '#D1D5DB' };
+      const ok = (svc.opportunity_size || '').split(' ')[0].toUpperCase();
+      return `
+      <div style="margin-bottom:18px;border-radius:8px;overflow:hidden;border:1px solid #C7D2FE">
+        <div style="background:#4F46E5;padding:9px 14px;display:flex;align-items:center;gap:8px">
+          <span style="font-size:13px">🎯</span>
+          <span style="font-size:9px;font-weight:700;letter-spacing:.12em;color:#C7D2FE;text-transform:uppercase">StepOneXP Service Fit</span>
+        </div>
+        <div style="background:#EEF2FF;padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start">
+          <div>
+            <div style="font-size:9px;font-weight:600;letter-spacing:.1em;color:#6366F1;text-transform:uppercase;margin-bottom:3px">Primary Service</div>
+            <div style="font-size:13px;font-weight:700;color:#1E1B4B;margin-bottom:8px">${e(svc.primary_service)}</div>
+            ${svc.pitch_reference ? `<div style="font-size:10.5px;color:#374151;margin-bottom:4px">📌 <strong>Reference:</strong> ${e(svc.pitch_reference)}</div>` : ''}
+            ${svc.first_event_possible ? `<div style="font-size:10.5px;color:#374151">🚀 <strong>First win:</strong> ${e(svc.first_event_possible)}</div>` : ''}
+          </div>
+          ${ok && oppBg[ok] ? `
+          <div style="background:${oppBg[ok]};border:1px solid ${oppBd[ok]};border-radius:6px;padding:8px 12px;text-align:center;min-width:80px">
+            <div style="font-size:8px;font-weight:700;letter-spacing:.1em;color:${oppTx[ok]};text-transform:uppercase;margin-bottom:2px">Opportunity</div>
+            <div style="font-size:12px;font-weight:700;color:${oppTx[ok]}">${e(ok)}</div>
+          </div>` : ''}
+        </div>
+      </div>`;
+    })()}
 
     ${eventCards ? `<div style="margin-bottom:16px">${eventCards}</div>` : '<div style="color:#9CA3AF;font-size:12px;padding:16px 0">No confirmed events found in research period.</div>'}
 
