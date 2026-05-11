@@ -9,8 +9,7 @@ ACTORS = {
     "website_crawler":      "apify/website-content-crawler",
     "google_search":        "apify/google-search-scraper",
     "instagram_scraper":    "apify/instagram-scraper",
-    "linkedin_search":      "harvestapi/linkedin-profile-search",
-    "linkedin_company":     "harvestapi/linkedin-company-scraper",
+    "company_employees":    "automation-lab/linkedin-company-employees-scraper",
     "reddit_scraper":       "trudax/reddit-scraper",
     "google_news":          "apify/google-news-scraper",
     "google_reviews":       "apify/google-maps-reviews-scraper",
@@ -21,7 +20,7 @@ ACTORS = {
 
 # ─── PER-PIPELINE ACTOR ASSIGNMENT ─────────────────────────────────────────────
 PIPELINE_ACTORS = {
-    "p01_company_overview":     ["website_crawler", "linkedin_company", "google_search"],
+    "p01_company_overview":     ["website_crawler", "google_search"],
     "p02_brand_identity":       ["website_crawler"],
     "p03_market_position":      ["google_search", "google_news"],
     "p04_competitor_mapping":   ["google_search", "website_crawler"],
@@ -29,8 +28,8 @@ PIPELINE_ACTORS = {
     "p06_experiential_footprint": ["google_news", "instagram_scraper", "google_search"],
     "p07_reputation_research":  ["reddit_scraper", "google_reviews", "trustpilot", "twitter_scraper"],
     "p08_strategic_watchouts":  ["google_news", "google_search"],
-    "p09_decision_makers":      ["linkedin_search", "linkedin_company"],
-    "p10_contact_intelligence": ["linkedin_search"],
+    "p09_decision_makers":      ["company_employees", "google_search"],
+    "p10_contact_intelligence": ["company_employees", "google_search"],
     "p11_outreach":             [],   # LLM only — no scraping
     "p12_tracking":             [],   # Internal logic only
 }
@@ -59,9 +58,10 @@ ACTOR_DEFAULTS = {
         "languageCode": "en",
         "countryCode": "in",   # India-first for StepOneXP context
     },
-    "linkedin_search": {
-        "maxResults": 5,
-        "searchType": "people",
+    "company_employees": {
+        # automation-lab/linkedin-company-employees-scraper
+        # Uses Google SERP — no LinkedIn cookie required
+        "maxEmployees": 15,
     },
     "reddit_scraper": {
         "maxItems": 30,

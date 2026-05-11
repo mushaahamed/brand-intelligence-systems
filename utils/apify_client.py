@@ -162,34 +162,24 @@ def crawl_website(url: str, pipeline_id: str, max_pages: int = 4) -> list:
     return result or []
 
 
-def scrape_linkedin_profiles(query: str, pipeline_id: str, max_results: int = 3,
-                              timeout_secs: int = 25) -> list:
-    """Search LinkedIn for profiles matching query. Timeout 25s — actor usually finishes in 5-15s."""
+def scrape_company_employees(company_linkedin_url: str, pipeline_id: str,
+                              max_employees: int = 15) -> list:
+    """
+    Scrape LinkedIn employees for a company using automation-lab/linkedin-company-employees-scraper.
+    This actor uses Google SERP discovery — NO LinkedIn cookie required.
+
+    Input:  company_linkedin_url — full URL e.g. https://www.linkedin.com/company/mamaearth/
+    Output: list of dicts with keys: name, headline, profileUrl, companySlug, companyName
+    """
     result = run_actor(
-        "linkedin_search",
-        {"searchQuery": query, "maxResults": max_results},
+        "company_employees",
+        {"companyUrls": [company_linkedin_url], "maxEmployees": max_employees},
         pipeline_id,
-        timeout_secs=timeout_secs,
+        timeout_secs=60,
     )
-    return result or []
-
-
-def scrape_linkedin_profiles_parallel(queries: list, pipeline_id: str,
-                                       max_results: int = 3) -> list:
-    """Run multiple LinkedIn searches in parallel — avoids sequential actor startup overhead."""
-    from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed
-    combined = []
-    with ThreadPoolExecutor(max_workers=min(len(queries), 3)) as ex:
-        futures = [
-            ex.submit(scrape_linkedin_profiles, q, pipeline_id, max_results)
-            for q in queries
-        ]
-        for f in _as_completed(futures, timeout=35):
-            try:
-                combined.extend(f.result() or [])
-            except Exception as e:
-                log.warning("parallel_linkedin_failed", error=str(e))
-    return combined
+    items = result or []
+    log.info("apify_employees_returned", url=company_linkedin_url, count=len(items))
+    return items
 
 
 def scrape_reddit(query: str, pipeline_id: str, max_items: int = 20) -> list:

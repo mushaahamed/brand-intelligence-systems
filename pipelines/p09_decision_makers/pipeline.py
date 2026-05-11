@@ -3,28 +3,26 @@ Pipeline 09 — Decision-Maker Identification
 ============================================
 Three-source strategy — strongest signal wins:
 
-  Source A — Apify LinkedIn People Search (PRIMARY):
-    harvestapi/linkedin-profile-search finds real profiles with job titles,
-    LinkedIn URLs, and company affiliation. 3 parallel queries targeting
-    CMO / VP Marketing / Brand Manager roles.
+  Source A — Apify LinkedIn Company Employees Scraper (PRIMARY):
+    automation-lab/linkedin-company-employees-scraper discovers real employees
+    via Google SERP — no LinkedIn cookie required. Returns name, headline,
+    profileUrl per employee. We call it with the company's LinkedIn URL.
 
-  Source B — Apify LinkedIn Company Scraper (SECONDARY):
-    harvestapi/linkedin-company-scraper pulls employee list directly from
-    the company's LinkedIn page.
+  Source B — Google Search (SUPPLEMENTARY):
+    2 parallel queries find extra LinkedIn profile URLs and signals from
+    the open web (press releases, team pages, LinkedIn posts).
 
-  Source C — Google Search (ENRICHMENT):
-    2 parallel Google queries find any additional LinkedIn URLs or team
-    page mentions. Also used to scrape the company's own team/about page.
+  Source C — Company Team Page (ENRICHMENT):
+    Scrape /about, /team, /leadership pages directly if company URL is known.
 
-  Source D — GPT-4o Knowledge (FALLBACK ONLY):
-    Only runs if A+B+C return zero real people. Uses training knowledge for
-    major known brands (HUL, Zomato, etc.) — NOT for small/unknown companies.
+  Source D — GPT-4o Knowledge (LAST RESORT):
+    Only runs when A + B + C return zero real people.
+    Only works for well-known public brands — empty is correct for unknowns.
 
 Merge logic:
-  1. LinkedIn profile results (verified URLs) — deduplicated by name
-  2. Company scraper employees added if not already seen
-  3. Google/team page results added if not already seen
-  4. GPT knowledge fills last slots ONLY if total < 2 and company is well-known
+  1. Employee scraper results (primary — verified LinkedIn URLs)
+  2. Google results added if not already seen
+  3. GPT knowledge fills ONLY if total == 0 and brand is well-known
   Final result: 2-5 ranked contacts with real LinkedIn URLs where possible.
 """
 import re, requests, structlog
@@ -32,7 +30,7 @@ from bs4 import BeautifulSoup
 from pipelines.base import BasePipeline
 from utils.apify_client import (
     run_google_searches_parallel,
-    scrape_linkedin_profiles_parallel,
+    scrape_company_employees,
     run_actor,
 )
 from utils.claude_client import synthesise
@@ -47,16 +45,16 @@ HEADERS = {
     "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
 }
 
-# ── System prompt — for synthesising raw LinkedIn + search data ───────────────
+# ── Synthesis prompt — ranks real scraped data ────────────────────────────────
 SYNTHESIS_SYSTEM_PROMPT = """You are a B2B sales intelligence analyst identifying marketing decision-makers for an experiential marketing pitch.
 
-From the raw LinkedIn profile data and search results provided, build a buying committee of 2-5 people who would own or influence experiential marketing / events / brand activation spend.
+From the raw LinkedIn employee data and search results provided, build a buying committee of 2-5 people who would own or influence experiential marketing / events / brand activation spend.
 
 For product brands (Dove→HUL, Gillette→P&G, Maggi→Nestlé) — include people at the PARENT COMPANY who manage that brand.
 
 STRICT RULES:
-- Only include people explicitly found in the provided data — real names from LinkedIn results or search snippets
-- A person is valid if they appear in: LinkedIn profile results, search result titles/snippets, or the team page
+- Only include people explicitly found in the provided data
+- A person is valid if they appear in: LinkedIn employee results, search result titles/snippets, or the team page
 - DO NOT invent anyone not found in the data
 - If fewer than 2 people are found, that is fine — accuracy over quantity
 - Prioritise people with a linkedin_url in the data
@@ -83,7 +81,7 @@ Return ONLY valid JSON:
   "committee_gap": "Which role is missing, or None"
 }"""
 
-# ── System prompt — GPT knowledge fallback (ONLY for well-known brands) ───────
+# ── GPT knowledge fallback — ONLY for well-known brands ──────────────────────
 KNOWLEDGE_FALLBACK_PROMPT = """You are a B2B sales intelligence expert.
 
 ONLY use this prompt if you have GENUINE training knowledge of named individuals at this specific company.
@@ -95,6 +93,30 @@ Rules:
 - NEVER invent names
 
 Return ONLY valid JSON with same schema as above. Set data_source to "gpt_knowledge"."""
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _find_company_linkedin_url(company_name: str) -> str | None:
+    """
+    Google search to find the company's LinkedIn page URL.
+    Returns the first result matching linkedin.com/company/SLUG or None.
+    """
+    queries = [
+        f'"{company_name}" site:linkedin.com/company',
+        f"{company_name} linkedin company page",
+    ]
+    results = run_google_searches_parallel(queries, PIPELINE_ID, num_results=5)
+    for r in (results or []):
+        url = r.get("url", "") or r.get("link", "")
+        if re.search(r'linkedin\.com/company/[a-zA-Z0-9_-]+', url or ""):
+            # Normalise to clean profile URL (no trailing query params)
+            match = re.search(r'(https?://(?:www\.|in\.)?linkedin\.com/company/[a-zA-Z0-9_-]+)', url)
+            if match:
+                clean = match.group(1).rstrip("/") + "/"
+                log.info("     LinkedIn company URL found", url=clean)
+                return clean
+    return None
 
 
 def _scrape_team_page(company_url: str) -> str:
@@ -118,97 +140,55 @@ def _scrape_team_page(company_url: str) -> str:
     return ""
 
 
-def _parse_linkedin_profiles(items: list, company_name: str) -> list:
+def _parse_employees(items: list, company_name: str) -> list:
     """
-    Parse raw output from harvestapi/linkedin-profile-search into a
-    normalised list of people dicts with name, title, linkedin_url, company.
-    Handles multiple field-name formats the actor might return.
-    """
-    people = []
-    company_lower = company_name.lower()
+    Parse output from automation-lab/linkedin-company-employees-scraper.
+    Each item has: name, headline, profileUrl, companySlug, companyName, source.
 
+    Filters to keep marketing/brand/events-relevant profiles.
+    Returns list of normalised people dicts.
+    """
+    marketing_keywords = [
+        "marketing", "brand", "cmo", "growth", "events", "experience",
+        "communications", "creative", "content", "digital", "commercial",
+        "activation", "sponsorship", "pr ", "public relations", "campaign",
+        "advertising", "media", "partnerships", "community",
+    ]
+
+    people = []
     for item in (items or []):
-        # Name — try multiple field names
-        name = (
-            item.get("fullName") or item.get("name") or
-            item.get("firstName", "") + " " + item.get("lastName", "")
-        ).strip()
-        if not name or name == " ":
+        name = (item.get("name") or "").strip()
+        if not name:
             continue
 
-        # Title
-        title = (
-            item.get("title") or item.get("headline") or
-            item.get("currentJobTitle") or item.get("jobTitle") or ""
-        ).strip()
+        headline = (item.get("headline") or "").strip()
+        profile_url = (item.get("profileUrl") or "").strip()
+        company = (item.get("companyName") or company_name).strip()
 
-        # LinkedIn URL
-        li_url = (
-            item.get("profileUrl") or item.get("linkedInUrl") or
-            item.get("url") or item.get("linkedinUrl") or ""
-        ).strip()
+        headline_lower = headline.lower()
+        is_marketing = any(kw in headline_lower for kw in marketing_keywords)
 
-        # Company
-        company = (
-            item.get("currentCompany") or item.get("company") or
-            item.get("currentCompanyName") or item.get("companyName") or ""
-        ).strip()
+        # Also include C-suite / VP / Director even without marketing keyword
+        # because they may have budget authority
+        is_senior = any(t in headline_lower for t in [
+            "chief", "ceo", "coo", "founder", "president", "vice president",
+            "vp ", "director", "head of", "head,",
+        ])
 
-        # Filter: keep if company matches (loosely) or if we have a title that looks marketing-related
-        marketing_keywords = [
-            "marketing", "brand", "cmo", "growth", "events", "experience",
-            "communications", "creative", "content", "digital", "commercial",
-        ]
-        title_lower = title.lower()
-        company_match = company_lower in (company or "").lower() or (company or "").lower() in company_lower
-        title_match = any(kw in title_lower for kw in marketing_keywords)
-
-        if not (company_match or title_match):
-            continue  # Skip clearly irrelevant profiles
+        if not (is_marketing or is_senior):
+            continue  # Skip clearly irrelevant roles (engineers, finance, etc.)
 
         people.append({
-            "name":       name,
-            "title":      title,
-            "company":    company or company_name,
-            "linkedin_url": li_url if "linkedin.com/in" in li_url else None,
-            "source":     "apify_linkedin",
+            "name":         name,
+            "title":        headline,
+            "company":      company,
+            "linkedin_url": profile_url if "linkedin.com/in/" in profile_url else None,
+            "source":       "apify_linkedin",
         })
 
-    return people
-
-
-def _parse_company_scraper(items: list) -> list:
-    """Parse harvestapi/linkedin-company-scraper employee output."""
-    people = []
-    for item in (items or []):
-        # Company scraper may return employees under different keys
-        employees = item.get("employees") or item.get("people") or []
-        if isinstance(employees, list):
-            for emp in employees:
-                name = (emp.get("fullName") or emp.get("name") or "").strip()
-                title = (emp.get("title") or emp.get("headline") or "").strip()
-                li_url = (emp.get("profileUrl") or emp.get("url") or "").strip()
-                if name:
-                    people.append({
-                        "name":       name,
-                        "title":      title,
-                        "company":    item.get("name", ""),
-                        "linkedin_url": li_url if "linkedin.com/in" in li_url else None,
-                        "source":     "apify_company",
-                    })
-        # Sometimes the scraper returns flat employee items
-        elif item.get("fullName") or item.get("name"):
-            name = (item.get("fullName") or item.get("name") or "").strip()
-            title = (item.get("title") or item.get("headline") or "").strip()
-            li_url = (item.get("profileUrl") or item.get("url") or "").strip()
-            if name:
-                people.append({
-                    "name":       name,
-                    "title":      title,
-                    "company":    "",
-                    "linkedin_url": li_url if "linkedin.com/in" in li_url else None,
-                    "source":     "apify_company",
-                })
+    log.info("     Employee parse complete",
+             total_scraped=len(items or []),
+             marketing_relevant=len(people))
     return people
 
 
@@ -223,23 +203,20 @@ def _extract_from_google(google_results: list) -> list:
         title   = item.get("title", "")
         snippet = item.get("snippet", "") or item.get("description", "")
 
-        if "linkedin.com/in/" in url:
+        if "linkedin.com/in/" in (url or ""):
             m = name_pattern.match(title.strip())
             if m:
-                name  = m.group(1).strip()
-                # Extract role from title (usually "Name - Title at Company | LinkedIn")
-                role  = ""
+                name = m.group(1).strip()
+                role = ""
                 parts = title.split(" - ")
                 if len(parts) > 1:
-                    role_part = parts[1].split(" at ")[0].split(" | ")[0].strip()
-                    role = role_part
+                    role = parts[1].split(" at ")[0].split(" | ")[0].strip()
                 people.append({
                     "name": name, "title": role,
                     "company": "", "linkedin_url": url, "source": "google",
                 })
         else:
-            # Scan snippet for inline LinkedIn URLs
-            for li_url in li_pattern.findall(snippet + " " + title):
+            for li_url in li_pattern.findall((snippet or "") + " " + title):
                 m = name_pattern.match(title.strip())
                 if m:
                     people.append({
@@ -250,8 +227,8 @@ def _extract_from_google(google_results: list) -> list:
     return people
 
 
-def _merge_people(sources: list[list]) -> list:
-    """Deduplicate and merge people from multiple sources."""
+def _merge_people(sources: list) -> list:
+    """Deduplicate and merge people from multiple sources. Returns top 10."""
     seen = {}
 
     def _norm(name: str) -> str:
@@ -265,13 +242,12 @@ def _merge_people(sources: list[list]) -> list:
             if key not in seen:
                 seen[key] = p
             else:
-                # Enrich existing entry with LinkedIn URL if we now have one
                 if p.get("linkedin_url") and not seen[key].get("linkedin_url"):
                     seen[key]["linkedin_url"] = p["linkedin_url"]
                 if p.get("title") and not seen[key].get("title"):
                     seen[key]["title"] = p["title"]
 
-    return list(seen.values())[:8]  # Keep top 8 for GPT to rank
+    return list(seen.values())[:10]
 
 
 class DecisionMakersPipeline(BasePipeline):
@@ -281,69 +257,52 @@ class DecisionMakersPipeline(BasePipeline):
     def fetch(self) -> dict:
         n   = self.company_name
         raw = {
-            "google_results":    [],
-            "team_page":         "",
-            "linkedin_profiles": [],
-            "company_employees": [],
+            "employee_items":  [],
+            "google_results":  [],
+            "team_page":       "",
+            "company_li_url":  None,
         }
 
-        # ── Source A: Apify LinkedIn people search (PRIMARY) ──────────────
-        li_queries = [
-            f"{n} Chief Marketing Officer OR CMO OR VP Marketing",
-            f"{n} Head of Marketing OR Marketing Director OR Brand Director",
-            f"{n} Brand Manager OR Events Manager OR Head of Brand",
-        ]
-        log.info("     Searching LinkedIn for decision-makers via Apify...")
-        li_profiles = scrape_linkedin_profiles_parallel(li_queries, PIPELINE_ID, max_results=4)
-        raw["linkedin_profiles"] = li_profiles or []
-        n_li = len(raw["linkedin_profiles"])
-        if n_li:
-            log.info(f"     LinkedIn returned {n_li} profiles")
+        # ── Step 1: Find company LinkedIn URL via Google ──────────────────
+        log.info("     Finding company LinkedIn page...")
+        li_url = _find_company_linkedin_url(n)
+        raw["company_li_url"] = li_url
 
-        # ── Source B: LinkedIn company scraper (get employees list) ───────
-        # Try to find the company's LinkedIn page first via Google
-        company_li_results = run_google_searches_parallel(
-            [f"{n} linkedin.com/company site:linkedin.com"], PIPELINE_ID, num_results=5
-        )
-        li_company_url = None
-        for r in (company_li_results or []):
-            url = r.get("url", "") or r.get("link", "")
-            if "linkedin.com/company/" in url:
-                li_company_url = url
-                break
+        # ── Step 2: Scrape employees via automation-lab actor (PRIMARY) ───
+        if li_url:
+            log.info(f"     Scraping LinkedIn employees from {li_url}...")
+            employee_items = scrape_company_employees(li_url, PIPELINE_ID, max_employees=20)
+            raw["employee_items"] = employee_items or []
+            log.info(f"     Employee scraper returned {len(raw['employee_items'])} items")
+        else:
+            log.warning("     Could not find company LinkedIn URL — skipping employee scrape")
 
-        if li_company_url:
-            company_data = run_actor(
-                "linkedin_company",
-                {"startUrls": [{"url": li_company_url}], "maxResults": 10},
-                PIPELINE_ID,
-                timeout_secs=30,
-            )
-            raw["company_employees"] = company_data or []
-
-        # ── Source C: Google search for extra LinkedIn URLs ────────────────
+        # ── Step 3: Google search for extra LinkedIn profile signals ──────
         google_queries = [
-            f"{n} marketing director manager brand head linkedin",
-            f"{n} CMO brand manager \"head of\" site:linkedin.com",
+            f"{n} marketing director OR CMO OR brand head site:linkedin.com",
+            f"{n} head of marketing OR VP marketing linkedin profile",
         ]
+        log.info("     Searching Google for additional LinkedIn signals...")
         raw["google_results"] = run_google_searches_parallel(
             google_queries, PIPELINE_ID, num_results=8
         )
-        log.info(f"     LinkedIn profiles searched — {len(raw['google_results'])} signals found")
+        n_google = len(raw["google_results"])
+        log.info(f"     Google returned {n_google} results")
 
-        # ── Source D: Team page ────────────────────────────────────────────
+        # ── Step 4: Team page scrape ──────────────────────────────────────
         if self.company_url:
             raw["team_page"] = _scrape_team_page(self.company_url)
 
         return raw
 
     def extract(self, raw: dict) -> dict:
-        # Parse each source into normalised people list
-        li_people      = _parse_linkedin_profiles(raw.get("linkedin_profiles", []), self.company_name)
-        company_people = _parse_company_scraper(raw.get("company_employees", []))
-        google_people  = _extract_from_google(raw.get("google_results", []))
+        # Parse employee scraper output
+        employee_people = _parse_employees(raw.get("employee_items", []), self.company_name)
 
-        # Build Google search text for synthesis prompt
+        # Parse Google results for extra LinkedIn URLs
+        google_people = _extract_from_google(raw.get("google_results", []))
+
+        # Build search text for synthesis context
         lines = []
         for item in raw.get("google_results", []):
             t = item.get("title", "")
@@ -353,25 +312,23 @@ class DecisionMakersPipeline(BasePipeline):
                 lines.append(f"RESULT: {t} | URL: {u} | INFO: {s[:200]}")
 
         return {
-            "company_name":   self.company_name,
-            "category":       self.category,
-            "li_people":      li_people,
-            "company_people": company_people,
-            "google_people":  google_people,
-            "search_text":    "\n".join(lines),
-            "team_page":      raw.get("team_page", "")[:2500],
-            "google_results": raw.get("google_results", []),
-            "total_li_found": len(li_people),
+            "company_name":    self.company_name,
+            "category":        self.category,
+            "company_li_url":  raw.get("company_li_url"),
+            "employee_people": employee_people,
+            "google_people":   google_people,
+            "search_text":     "\n".join(lines),
+            "team_page":       raw.get("team_page", "")[:2500],
+            "total_scraped":   len(raw.get("employee_items", [])),
         }
 
     def synthesise(self, structured: dict) -> dict:
         n        = structured["company_name"]
         category = structured["category"]
 
-        # Merge all real-data sources
+        # Merge all real-data sources (employee scraper is primary)
         merged_raw = _merge_people([
-            structured["li_people"],
-            structured["company_people"],
+            structured["employee_people"],
             structured["google_people"],
         ])
 
@@ -379,17 +336,17 @@ class DecisionMakersPipeline(BasePipeline):
         final_people  = []
 
         if merged_raw:
-            # We have real data — ask GPT to rank, enrich and structure it
             people_text = "\n".join(
-                f"- {p['name']} | {p['title']} | {p.get('company','')} | "
-                f"LinkedIn: {p.get('linkedin_url') or 'not found'} | source: {p.get('source','')}"
+                f"- {p['name']} | {p['title']} | {p.get('company', '')} | "
+                f"LinkedIn: {p.get('linkedin_url') or 'not found'} | source: {p.get('source', '')}"
                 for p in merged_raw
             )
 
             synthesis_prompt = f"""COMPANY: {n}
 CATEGORY: {category}
+LINKEDIN PAGE: {structured.get('company_li_url') or 'not found'}
 
-PEOPLE FOUND IN REAL DATA (LinkedIn + Google):
+EMPLOYEES FOUND VIA LINKEDIN SCRAPER:
 {people_text}
 
 TEAM PAGE EXCERPT:
@@ -401,18 +358,18 @@ ADDITIONAL SEARCH SIGNALS:
 From the people above, identify the 2-5 best marketing/events decision-makers to contact.
 Only include people from the data above — do not add anyone not listed."""
 
-            raw_result  = synthesise(SYNTHESIS_SYSTEM_PROMPT, synthesis_prompt, max_tokens=1400)
+            raw_result    = synthesise(SYNTHESIS_SYSTEM_PROMPT, synthesis_prompt, max_tokens=1400)
             search_parsed = safe_json_parse(raw_result or "") or {}
             final_people  = search_parsed.get("buying_committee", [])
 
-        # If no real data found at all → try GPT knowledge as last resort
+        # Last resort: GPT knowledge only if zero from all sources
         if not final_people:
             log.info("     No LinkedIn data found — trying GPT knowledge for known brands...")
             knowledge_prompt = f"""COMPANY: {n}
 CATEGORY: {category}
 WEBSITE: {self.company_url or 'unknown'}
 
-LinkedIn search and Google search returned no people for this company.
+LinkedIn scraper and Google search returned no people for this company.
 Only proceed if you have genuine training knowledge of named individuals at {n}.
 If this is a small or private company you don't have real knowledge of, return an empty buying_committee."""
 
@@ -422,7 +379,6 @@ If this is a small or private company you don't have real knowledge of, return a
             final_people  = kb_parsed.get("buying_committee", [])
             search_parsed = kb_parsed
 
-        # Determine primary contact
         primary = next(
             (p["name"] for p in final_people if p.get("outreach_priority") == "PRIMARY"),
             final_people[0]["name"] if final_people else None
@@ -431,7 +387,11 @@ If this is a small or private company you don't have real knowledge of, return a
         committee_gap = search_parsed.get("committee_gap", "None")
         parent_co     = search_parsed.get("parent_company")
 
-        log.info(f"     {len(final_people)} decision-makers identified · Primary: {primary} · Confidence: {confidence}")
+        log.info(
+            f"     {len(final_people)} decision-makers identified · "
+            f"Primary: {primary} · Confidence: {confidence} · "
+            f"Source: {'apify_linkedin' if structured['total_scraped'] > 0 else 'gpt_knowledge'}"
+        )
 
         return {
             "buying_committee":     final_people,
