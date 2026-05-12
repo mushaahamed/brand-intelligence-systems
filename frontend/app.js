@@ -660,7 +660,7 @@ function renderEventsCard(d) {
         ${badge(ev.brand_role, 'green')}
         ${badge(ev.production_quality, 'amber')}
       </div>
-      ${ev.source && ev.source !== 'inferred from brand scale / training knowledge'
+      ${ev.source && !/training|inferred|knowledge|gpt|llm/i.test(ev.source)
         ? `<div style="margin-top:6px;font-size:11px;color:var(--text-3)">${esc(ev.source.slice(0,100))}</div>` : ''}
     </div>`).join('');
 

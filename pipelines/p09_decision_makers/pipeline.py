@@ -81,18 +81,24 @@ Return ONLY valid JSON:
   "committee_gap": "Which role is missing, or None"
 }"""
 
-# ── GPT knowledge fallback — ONLY for well-known brands ──────────────────────
-KNOWLEDGE_FALLBACK_PROMPT = """You are a B2B sales intelligence expert.
+# ── GPT knowledge fallback — proactive brand intelligence ────────────────────
+KNOWLEDGE_FALLBACK_PROMPT = """You are a senior B2B sales intelligence expert with deep knowledge of FMCG, consumer brands, and Indian marketing.
 
-ONLY use this prompt if you have GENUINE training knowledge of named individuals at this specific company.
+CRITICAL RULES:
+1. For well-known consumer brands (Dove, Gillette, Maggi, Lifebuoy, etc.) — these are managed by parent companies (HUL, P&G, Nestlé, etc.). Return the PARENT COMPANY's senior marketing/brand leaders who manage this brand.
+2. For standalone companies (banks, tech companies, D2C brands) — return known senior marketing decision-makers.
+3. Return 2-5 REAL people you have genuine knowledge of. Use full real names and accurate titles.
+4. If you genuinely have NO knowledge of anyone at this company or its parent, return empty array.
+5. NEVER invent fictional names. Only real people from your training data.
 
-Rules:
-- Only include people you genuinely know — real names from training data
-- If you don't have real knowledge of specific individuals, return an empty buying_committee
-- Empty is correct for small or less-publicly visible companies
-- NEVER invent names
+Indian FMCG reference:
+- Dove, Lux, Lifebuoy, Surf, Rin → HUL (Hindustan Unilever) — look for HUL CMO, VP Marketing, Brand Director roles
+- Maggi, KitKat, Munch → Nestlé India — look for VP Marketing, Category Marketing Director
+- Gillette, Ariel, Pampers → P&G India — look for Marketing Director, Brand Manager (Grooming/Fabric Care)
+- Pepsi, Mountain Dew, Lay's → PepsiCo India — look for VP Marketing India
+- Coca-Cola, Sprite, Thums Up → Coca-Cola India — look for IMC/Marketing Director
 
-Return ONLY valid JSON with same schema as above. Set data_source to "gpt_knowledge"."""
+Return ONLY valid JSON using the same schema. Set data_source to "gpt_knowledge"."""
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -381,16 +387,22 @@ Only include people with at least one piece of evidence in the data above — do
             search_parsed = safe_json_parse(raw_result or "") or {}
             final_people  = search_parsed.get("buying_committee", [])
 
-        # Last resort: GPT knowledge only if zero from all sources
+        # Last resort: use GPT brand knowledge — works well for major FMCG/consumer brands
         if not final_people:
-            log.info("     No LinkedIn data found — trying GPT knowledge for known brands...")
-            knowledge_prompt = f"""COMPANY: {n}
+            log.info("     No scraped data found — using GPT brand knowledge fallback...")
+            knowledge_prompt = f"""COMPANY / BRAND: {n}
 CATEGORY: {category}
 WEBSITE: {self.company_url or 'unknown'}
+CONTEXT: This is an experiential marketing agency in India researching who to pitch to.
 
-LinkedIn scraper and Google search returned no people for this company.
-Only proceed if you have genuine training knowledge of named individuals at {n}.
-If this is a small or private company you don't have real knowledge of, return an empty buying_committee."""
+Scraped sources returned no people. Use your training knowledge to identify real senior
+marketing decision-makers who control experiential / events / brand activation budget for {n}.
+
+If {n} is a product brand owned by a larger company (e.g. Dove→HUL, Maggi→Nestlé),
+identify the PARENT COMPANY's marketing leaders who manage this brand line.
+
+Return real people you have genuine knowledge of. Return empty array only if you truly
+have no knowledge of anyone at this company or its parent."""
 
             kb_raw    = synthesise(KNOWLEDGE_FALLBACK_PROMPT, knowledge_prompt,
                                    model=OPENAI_MODEL_FULL, max_tokens=1200)
