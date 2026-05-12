@@ -47,7 +47,19 @@ function toast(msg, ms = 3000) {
 
 function initials(name) {
   if (!name) return '?';
-  return name.split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('');
+  // Strip "Role — Company" placeholders so initials look sensible
+  const clean = name.includes(' — ') ? name.split(' — ')[0].trim() : name;
+  return clean.split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('');
+}
+
+function displayName(name) {
+  // If it's a placeholder like "Marketing Lead — Dove", show it clearly
+  if (!name) return '—';
+  if (name.includes(' — ')) {
+    const [role, co] = name.split(' — ');
+    return `${role.trim()} <span style="color:var(--text-3);font-size:11px">@ ${co.trim()}</span>`;
+  }
+  return esc(name);
 }
 
 /* ── KV helper (new CSS class names) ── */
@@ -729,7 +741,7 @@ function renderPeopleCard(p09, p10) {
     return `
     <div class="person-card">
       <div class="person-avatar">${ini}</div>
-      <div class="person-name">${esc(p.name || '—')}</div>
+      <div class="person-name">${displayName(p.name)}</div>
       <div class="person-title">${esc(p.title || '—')}</div>
       <div class="person-score-label">Decision Relevance ${score}/5</div>
       <div class="person-score-bar"><div class="person-score-fill" style="width:${score * 20}%"></div></div>

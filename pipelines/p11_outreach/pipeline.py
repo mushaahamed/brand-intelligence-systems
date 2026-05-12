@@ -178,22 +178,40 @@ class OutreachPipeline(BasePipeline):
                 "linkedin_activity":       person.get("linkedin_activity", "UNKNOWN"),
             })
 
-        # Fallback: if buying committee is empty, use p10 contacts directly
+        # Fallback 1: if buying committee is empty, use p10 contacts directly
         if not merged_contacts:
             for c in contacts_p10[:4]:
                 email    = c.get("email")
                 linkedin = c.get("linkedin_url") or c.get("linkedin")
-                merged_contacts.append({
-                    "name":                    c.get("name", ""),
-                    "title":                   c.get("title", ""),
-                    "email":                   email,
-                    "linkedin":                linkedin,
-                    "role_type":               c.get("role_type", "INFLUENCER"),
-                    "outreach_priority":       c.get("outreach_priority", "SECONDARY"),
-                    "decision_relevance_score": c.get("decision_relevance_score", 50),
-                    "personalisation_hook":    c.get("personalisation_hook", ""),
-                    "linkedin_activity":       c.get("linkedin_activity", "UNKNOWN"),
-                })
+                if c.get("name"):
+                    merged_contacts.append({
+                        "name":                    c.get("name", ""),
+                        "title":                   c.get("title", ""),
+                        "email":                   email,
+                        "linkedin":                linkedin,
+                        "role_type":               c.get("role_type", "INFLUENCER"),
+                        "outreach_priority":       c.get("outreach_priority", "SECONDARY"),
+                        "decision_relevance_score": c.get("decision_relevance_score", 50),
+                        "personalisation_hook":    c.get("personalisation_hook", ""),
+                        "linkedin_activity":       c.get("linkedin_activity", "UNKNOWN"),
+                    })
+
+        # Fallback 2: absolute last resort — always write outreach to SOMEONE
+        if not merged_contacts:
+            cat = self.category or "consumer brand"
+            merged_contacts.append({
+                "name":                    f"Marketing Head — {self.company_name}",
+                "title":                   "Head of Marketing",
+                "email":                   None,
+                "linkedin":                None,
+                "role_type":               "Economic Buyer",
+                "outreach_priority":       "PRIMARY",
+                "decision_relevance_score": 3,
+                "personalisation_hook":    (
+                    f"Verify contact on LinkedIn — search 'Head of Marketing {self.company_name}'"
+                ),
+                "linkedin_activity":       "UNKNOWN",
+            })
 
         # ── Competitor intel ──────────────────────────────────────────
         comp_intel = []
