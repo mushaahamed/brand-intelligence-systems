@@ -1,68 +1,80 @@
 # Skill: github-sync
 
 ## Trigger
-Use this skill whenever the user pastes a GitHub URL that points to a file in this repository (github.com/mushaahamed/brand-intelligence-systems).
+Activate immediately when the user pastes ANY of these:
+- A URL containing `github.com/mushaahamed/brand-intelligence-systems`
+- A URL containing `raw.githubusercontent.com/mushaahamed/brand-intelligence-systems`
+- A file path like `pipelines/p09.../pipeline.py` with no other context
 
-Trigger patterns:
-- Any URL matching `github.com/mushaahamed/brand-intelligence-systems/blob/*`
-- User says "update this file", "sync this", "use this version", "replace with this"
-- User pastes a raw.githubusercontent.com URL for this repo
+## CRITICAL RULE — NO QUESTIONS
+**Do NOT ask any questions. Do NOT show a menu. Do NOT ask about JSON fields, output format, or anything else.**
+Just execute steps 1-6 immediately and silently.
 
-## What This Skill Does
-Fetches the file content from GitHub and writes it to the correct local path — no manual copy-paste needed.
+---
 
-## Steps
+## Execute These Steps Immediately
 
-1. **Parse the URL** — extract the file path from the GitHub URL.
-   - GitHub blob URL format: `https://github.com/mushaahamed/brand-intelligence-systems/blob/main/PATH/TO/FILE.py`
-   - Convert to raw URL: `https://raw.githubusercontent.com/mushaahamed/brand-intelligence-systems/main/PATH/TO/FILE.py`
+### Step 1 — Convert to raw URL
+If URL contains `/blob/`:
+```
+https://github.com/mushaahamed/brand-intelligence-systems/blob/main/PATH
+→ https://raw.githubusercontent.com/mushaahamed/brand-intelligence-systems/main/PATH
+```
+If already a `raw.githubusercontent.com` URL — use as-is.
 
-2. **Fetch the raw file** using WebFetch on the raw URL.
+### Step 2 — Fetch the file
+Use WebFetch on the raw URL. No confirmation needed.
 
-3. **Determine local path** — map the repo path to the local filesystem:
-   - Repo root = `C:\Users\musha ahamed\OneDrive\Documents\brand-intelligence-system\`
-   - e.g. `pipelines/p09_decision_makers/pipeline.py` → `C:\Users\musha ahamed\OneDrive\Documents\brand-intelligence-system\pipelines\p09_decision_makers\pipeline.py`
+### Step 3 — Map to local path
+```
+Repo path  →  Local path
+ANY/PATH/FILE  →  C:\Users\musha ahamed\OneDrive\Documents\brand-intelligence-system\ANY\PATH\FILE
+```
 
-4. **Read the existing local file** first (required before Write).
+### Step 4 — Read existing local file
+Use Read tool on the local path (required before Write). If file doesn't exist yet, skip Read.
 
-5. **Write the fetched content** to the local path using the Write tool.
+### Step 5 — Write the file
+Use Write tool to save fetched content to local path. Done.
 
-6. **Confirm** — tell the user which file was updated and its size.
+### Step 6 — Report + syntax check
+Print one line: `✅ Written: pipelines/p09.../pipeline.py (1234 bytes)`
 
-7. **If it's a pipeline file** (`pipeline.py`), also run:
-   ```
-   cd "C:\Users\musha ahamed\OneDrive\Documents\brand-intelligence-system" && python -c "import pipelines.PIPELINE_ID.pipeline" 2>&1
-   ```
-   to verify it imports without syntax errors.
+If it's a `pipeline.py` file, run:
+```bash
+cd "C:\Users\musha ahamed\OneDrive\Documents\brand-intelligence-system" && python -m py_compile pipelines/FOLDER/pipeline.py && echo "syntax ok"
+```
 
-8. **Offer to commit** — ask if they want to `git add` and `git commit` the change.
+Then ask ONE thing only: "Commit this? (yes/no)"
 
-## Example Usage
+---
 
-User pastes:
+## Examples
+
+**User pastes:**
 ```
 https://github.com/mushaahamed/brand-intelligence-systems/blob/main/pipelines/p09_decision_makers/pipeline.py
 ```
+**Claude does:** Fetch raw → Read local → Write local → syntax check → report done. No questions before this.
 
-Claude should:
-- Fetch `https://raw.githubusercontent.com/mushaahamed/brand-intelligence-systems/main/pipelines/p09_decision_makers/pipeline.py`
-- Write to `C:\Users\musha ahamed\OneDrive\Documents\brand-intelligence-system\pipelines\p09_decision_makers\pipeline.py`
-- Run syntax check
-- Report success
+**User pastes:**
+```
+https://github.com/mushaahamed/brand-intelligence-systems/blob/main/frontend/app.js
+```
+**Claude does:** Fetch raw → Write to `frontend/app.js` → report done.
 
-## Pipeline ID Mapping
+**User pastes:**
+```
+https://github.com/mushaahamed/brand-intelligence-systems/blob/main/pipelines/p11_outreach/pipeline.py
+```
+**Claude does:** Fetch raw → Write to `pipelines/p11_outreach/pipeline.py` → syntax check → report done.
 
-| Folder | Pipeline ID |
-|--------|------------|
-| p01_company_overview | p01_company_overview |
-| p02_brand_identity | p02_brand_identity |
-| p03_market_position | p03_market_position |
-| p04_competitor_mapping | p04_competitor_mapping |
-| p05_brand_activity | p05_brand_activity |
-| p06_experiential_footprint | p06_experiential_footprint |
-| p07_reputation_research | p07_reputation_research |
-| p08_strategic_watchouts | p08_strategic_watchouts |
-| p09_decision_makers | p09_decision_makers |
-| p10_contact_intelligence | p10_contact_intelligence |
-| p11_outreach | p11_outreach |
-| p12_tracking | p12_tracking |
+---
+
+## What NOT to do
+- ❌ Do NOT ask "What fields should the JSON output include?"
+- ❌ Do NOT ask "What do you want to build?"
+- ❌ Do NOT show numbered options or menus
+- ❌ Do NOT ask about purpose, description, or intent
+- ❌ Do NOT trigger the skill-creator workflow
+- ✅ Just fetch → write → report
