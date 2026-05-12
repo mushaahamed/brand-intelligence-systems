@@ -1,45 +1,36 @@
 # Skill: p02-brand-identity
 
 ## Trigger
-User pastes the GitHub link for p02, or says "run p02", "brand identity", "brand colours", "brand fonts", "tone of voice"
+"run p02", "brand identity", "brand colours for [brand]", "brand fonts", "tone of voice for [brand]"
 
-## Step 1 — Ask this one question
+## Step 1 — Ask
 "What's the brand name and website URL?"
 
-## Step 2 — Do the analysis using these exact steps
+## Step 2 — Do this yourself using WebFetch and web search
 
-**Crawl the website:**
-- Fetch the homepage using WebFetch — look for colour hex codes, font-family names, CSS variables
-- Fetch /about or /about-us — look for brand story, mission, values
-- Look at image descriptions, button styles, design language
+Fetch their homepage — look for colour hex codes, font names, CSS styles, design language.
+Fetch /about — look for brand story, mission, values, messaging.
+Search the web for "[brand] brand guidelines visual identity".
 
-**Search Google for:**
-- "[brand] brand guidelines colours fonts"
-- "[brand] brand identity visual style India"
-
-**From all the data, produce this exact output:**
+## Step 3 — Produce this output
 
 ```
-BRAND IDENTITY — [Brand Name]
-==============================
-Primary Colors: [hex codes found e.g. #FF6B35, #FFFFFF]
-Secondary Colors: [hex codes]
-Primary Fonts: [font names e.g. Helvetica Neue, Playfair Display]
+BRAND IDENTITY — [Brand]
+=========================
+Primary Colours: [hex codes e.g. #FF6B35]
+Secondary Colours: [hex codes]
+Fonts: [font names e.g. Helvetica Neue, Playfair Display]
 
-Brand Tone: Warm / Bold / Minimal / Playful / Premium / Trustworthy
-Brand Personality: [50-word description of how the brand sounds and feels]
-Visual Style: Photography-led / Illustration-heavy / Icon-driven / Text-focused
+Tone: Warm / Bold / Minimal / Playful / Premium / Trustworthy
+Personality: [50 words — how the brand sounds and feels]
+Visual Style: Photography-led / Illustration / Icon-driven / Text-focused
 
 Brand Voice Keywords:
-• [word/phrase the brand uses repeatedly]
-• [word/phrase]
-• [word/phrase]
+• [word or phrase the brand uses]
+• [word or phrase]
+• [word or phrase]
 
-Key Messaging Themes:
-• [theme 1 — what the brand stands for]
-• [theme 2]
-
-Activation Recommendations for StepOneXP:
-• [experiential idea that fits this brand's visual identity]
-• [experiential idea]
+Activation Ideas for StepOneXP:
+• [experiential idea matching this brand's identity]
+• [idea 2]
 ```

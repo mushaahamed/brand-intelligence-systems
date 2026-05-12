@@ -1,44 +1,41 @@
 # Skill: p04-competitor-mapping
 
 ## Trigger
-User pastes the GitHub link for p04, or says "run p04", "competitors", "competitor mapping", "who competes with [brand]", "competitive landscape"
+"run p04", "competitors of [brand]", "competitor mapping", "who competes with [brand]", "competitive landscape"
 
-## Step 1 — Ask this one question
+## Step 1 — Ask
 "What's the brand name and category? (e.g. Dove, FMCG skincare)"
 
-## Step 2 — Do the analysis using these exact steps
+## Step 2 — Do this yourself using web search and WebFetch
 
-**Search Google for:**
-- "[brand] competitors alternatives India 2024"
-- "[brand] vs [category] brands market"
-- "[competitor name] experiential marketing events activation India" (for top 2-3 competitors found)
+Search the web for:
+- "[brand] top competitors India [category]"
+- "[competitor name] experiential marketing events activation India" (for top 3 competitors found)
 
-**For each competitor found, also fetch their homepage briefly to see their messaging.**
+Fetch homepage of each competitor briefly to see their messaging.
 
-**From all the data, produce this exact output:**
+## Step 3 — Produce this output
 
 ```
-COMPETITOR MAPPING — [Brand Name]
-===================================
+COMPETITOR MAPPING — [Brand]
+=============================
 Competitive Urgency: HIGH / MEDIUM / LOW
 
 COMPETITOR 1: [Name]
-  Website: [URL]
   Threat Level: HIGH / MEDIUM / LOW
-  What they're doing in experiential: [specific events, activations, sponsorships]
-  Their pitch to consumers: [how they position themselves]
-  Gap vs [brand]: [where Brand is losing ground to this competitor]
+  Experiential activity: [specific events or activations they're doing]
+  Positioning: [how they pitch themselves]
+  Gap created for [brand]: [what Brand is losing to this competitor]
 
 COMPETITOR 2: [Name]
-  Website: [URL]
   Threat Level: HIGH / MEDIUM / LOW
-  What they're doing in experiential: [specific activity]
-  Their pitch to consumers: [positioning]
-  Gap vs [brand]: [gap]
+  Experiential activity: [specific activity]
+  Positioning: [their pitch]
+  Gap created for [brand]: [gap]
 
 COMPETITOR 3: [Name]
-  [same structure]
+  [same]
 
-Pitch Angle for StepOneXP:
-"[One punchy sentence naming the top competitor and what they're doing that Brand isn't — this becomes Touch 3 of the outreach email]"
+Outreach Intel (for Touch 3 email):
+"[One punchy sentence: competitor name + what they're doing in experiential + what Brand is missing]"
 ```

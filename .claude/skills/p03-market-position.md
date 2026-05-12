@@ -1,46 +1,38 @@
 # Skill: p03-market-position
 
 ## Trigger
-User pastes the GitHub link for p03, or says "run p03", "market position", "brand sentiment", "share of voice", "how is [brand] perceived"
+"run p03", "market position", "brand sentiment for [brand]", "share of voice", "how is [brand] perceived"
 
-## Step 1 — Ask this one question
-"What's the brand name? (and website URL if you have it)"
+## Step 1 — Ask
+"What's the brand name?"
 
-## Step 2 — Do the analysis using these exact steps
+## Step 2 — Do this yourself using web search
 
-**Search Google for:**
-- "[brand] brand perception reviews consumer opinion India 2024 2025"
-- "[brand] vs competitors market share positioning"
-- "[brand] marketing campaigns earned media press"
+Search the web for:
+- "[brand] consumer reviews perception India 2024 2025"
+- "[brand] vs competitors market share"
+- "[brand] campaigns press coverage earned media"
 
-**Look at search result titles and snippets to understand:**
-- How journalists write about this brand
-- How consumers talk about it
-- What the brand is associated with
-
-**From all the data, produce this exact output:**
+## Step 3 — Produce this output
 
 ```
-MARKET POSITION — [Brand Name]
-================================
-Brand Sentiment: POSITIVE / NEUTRAL / NEGATIVE / MIXED
-Share of Voice Level: HIGH / MEDIUM / LOW
-Perception Gap Score: [1-5] (how far perception lags reality)
+MARKET POSITION — [Brand]
+==========================
+Sentiment: POSITIVE / NEUTRAL / NEGATIVE / MIXED
+Share of Voice: HIGH / MEDIUM / LOW
+Perception Gap: [1-5] (1=perception matches reality, 5=huge gap)
 
-Positioning Summary:
-[How the brand is positioned in its category — what they're known for]
+Positioning: [how the brand is known in its category]
 
-Key Differentiators:
-• [what makes them stand out vs competitors]
+Differentiators:
+• [what makes them stand out]
 • [differentiator 2]
 
-Vulnerability Points:
-• [where a competitor could attack them]
+Vulnerabilities:
+• [where a competitor can attack]
 • [vulnerability 2]
 
-Experiential Gap:
-[Where StepOneXP can add value — what physical/real-world presence is missing]
+Experiential Gap: [what physical presence is missing that StepOneXP can fill]
 
-Pitch Angle:
-[One sentence on how to frame the StepOneXP pitch for this brand specifically]
+Pitch Angle: [one sentence on how to frame the StepOneXP pitch for this brand]
 ```

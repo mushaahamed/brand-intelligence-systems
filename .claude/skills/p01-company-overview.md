@@ -1,53 +1,48 @@
 # Skill: p01-company-overview
 
 ## Trigger
-User pastes the GitHub link for p01, or says "run p01", "company overview", "ICP score"
+"run p01", "company overview", "ICP score for [brand]", "overview of [brand]"
 
-## Step 1 — Ask this one question
+## Step 1 — Ask
 "What's the brand name and website URL?"
 
-## Step 2 — Do the analysis using these exact steps
+## Step 2 — Do this yourself using WebFetch and web search
 
-**Crawl the website:**
-- Fetch the homepage using WebFetch
-- Fetch /about, /about-us, /team, /press pages
+Fetch these pages from their website:
+- Homepage
+- /about or /about-us
+- /team or /press
 
-**Search Google for:**
+Search the web for:
 - "[brand] employees founded funding revenue"
-- "[brand] investors series funding headquarters India"
+- "[brand] investors headquarters India"
 
-**From all the data, produce this exact output:**
+## Step 3 — Produce this output
 
 ```
-COMPANY OVERVIEW — [Brand Name]
-================================
-Business Model: B2C / B2B / B2B2C / SaaS / Other
-Industry Vertical: [specific sub-vertical]
-Founded: [year or Unknown]
-Employee Count: 1-10 / 11-50 / 51-200 / 200-1000 / 1000+
-Funding Status: Bootstrapped / Seed / Series A / Series B / Series C+ / Public / Unknown
-HQ City: [city]
-Geography: [countries/cities active]
-Revenue Range: [estimate]
+COMPANY OVERVIEW — [Brand]
+==========================
+Business Model: B2C / B2B / B2B2C / SaaS
+Industry: [vertical]
+Founded: [year]
+Employees: 1-10 / 11-50 / 51-200 / 200-1000 / 1000+
+Funding: Bootstrapped / Seed / Series A / B / C+ / Public / Unknown
+HQ: [city]
+Geography: [where active]
 
-ICP FIT SCORE: [0-100]
-  B2C brand         → +25
-  200+ employees    → +25
-  VC-backed/Public  → +25
-  India presence    → +25
+ICP FIT SCORE: [X]/100
+  B2C brand → +25 pts
+  200+ employees → +25 pts
+  VC-backed or Public → +25 pts
+  India presence → +25 pts
 
 Experiential Readiness: HIGH / MEDIUM / LOW
-Marketing Maturity: [1-5]
-Website Quality: [1-5]
-Recommended Service: [which StepOneXP service to lead with]
+Recommended StepOneXP Service: [service name]
 
-Company Narrative:
-[100-word summary of what the company does, who they serve, and why they matter]
+Summary: [100 words on what the company does and why they're a fit]
 
 Key Facts:
-• [fact 1]
-• [fact 2]
-• [fact 3]
-
-Sources Used: [URLs]
+• [fact from research]
+• [fact]
+• [fact]
 ```
