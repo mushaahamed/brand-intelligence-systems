@@ -401,10 +401,10 @@ function renderIcpCard(d, p06) {
       ${readiness ? `<div class="badge ${readCls}" style="margin-top:6px">${esc(readiness)}</div>` : ''}
       ${d.recommended_service ? `<div class="icp-service-hint">${esc(d.recommended_service)}</div>` : ''}
       ${svcService ? `
-      <div style="margin-top:10px;padding:8px 10px;background:rgba(79,70,229,0.12);border:1px solid rgba(99,102,241,0.3);border-radius:6px;text-align:center">
-        <div style="font-family:var(--mono);font-size:8px;color:#818CF8;letter-spacing:.1em;text-transform:uppercase;margin-bottom:3px">Service Fit</div>
-        <div style="font-size:11px;font-weight:600;color:#C7D2FE;line-height:1.3">${esc(svcService)}</div>
-        ${svcOpp ? `<div style="margin-top:4px;font-size:9px;color:#A5B4FC">${esc(svcOpp.split('(')[0].trim())}</div>` : ''}
+      <div style="margin-top:10px;padding:8px 10px;background:var(--indigo-dim);border:1px solid var(--indigo-border);border-radius:6px;text-align:center">
+        <div style="font-family:var(--mono);font-size:8px;color:var(--indigo-light);letter-spacing:.1em;text-transform:uppercase;margin-bottom:3px">Service Fit</div>
+        <div style="font-size:11px;font-weight:600;color:var(--indigo-light);line-height:1.3">${esc(svcService)}</div>
+        ${svcOpp ? `<div style="margin-top:4px;font-size:9px;color:var(--indigo)">${esc(svcOpp.split('(')[0].trim())}</div>` : ''}
       </div>` : ''}
     </div>`;
 }
@@ -607,27 +607,26 @@ function renderEventsCard(d) {
   const sColor = score >= 4 ? 'green' : score >= 2 ? '' : 'amber';
   const svc    = d.agency_service_fit || {};
 
-  /* ── Agency Service Fit banner ── */
+  /* ── Agency Service Fit banner — dark-mode palette ── */
   const oppColors = {
-    'LARGE': { bg: '#D1FAE5', border: '#6EE7B7', text: '#065F46' },
-    'MEDIUM': { bg: '#FEF3C7', border: '#FCD34D', text: '#92400E' },
-    'SMALL': { bg: '#F3F4F6', border: '#D1D5DB', text: '#374151' },
+    'LARGE':  { bg: 'rgba(34,197,94,0.10)',   border: 'rgba(34,197,94,0.28)',   text: '#22C55E' },
+    'MEDIUM': { bg: 'rgba(245,158,11,0.10)',  border: 'rgba(245,158,11,0.28)',  text: '#F59E0B' },
+    'SMALL':  { bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.10)', text: '#8896B4' },
   };
   const oppKey    = (svc.opportunity_size || '').split(' ')[0].toUpperCase();
   const oppStyle  = oppColors[oppKey] || oppColors['MEDIUM'];
 
-  /* Proof reference colour (indigo) */
   const serviceFitBlock = svc.primary_service ? `
-    <div style="margin-bottom:20px;border-radius:10px;overflow:hidden;border:1px solid #C7D2FE">
-      <div style="background:#4F46E5;padding:10px 16px;display:flex;align-items:center;gap:10px">
+    <div style="margin-bottom:20px;border-radius:10px;overflow:hidden;border:1px solid rgba(0,211,122,0.25)">
+      <div style="background:rgba(0,211,122,0.18);padding:10px 16px;display:flex;align-items:center;gap:10px">
         <span style="font-size:16px">🎯</span>
-        <span style="font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:#C7D2FE;text-transform:uppercase;font-weight:700">Agency Service Fit</span>
+        <span style="font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--indigo-light);text-transform:uppercase;font-weight:700">Agency Service Fit</span>
       </div>
-      <div style="background:#EEF2FF;padding:14px 16px;display:grid;gap:10px">
+      <div style="background:rgba(0,211,122,0.06);padding:14px 16px;display:grid;gap:10px">
         <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap">
           <div style="flex:1;min-width:180px">
-            <div style="font-family:var(--mono);font-size:9px;color:#6366F1;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Primary Service</div>
-            <div style="font-size:14px;font-weight:700;color:#1E1B4B">${esc(svc.primary_service)}</div>
+            <div style="font-family:var(--mono);font-size:9px;color:var(--indigo-light);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Primary Service</div>
+            <div style="font-size:14px;font-weight:700;color:var(--text)">${esc(svc.primary_service)}</div>
           </div>
           ${svc.opportunity_size ? `
           <div style="background:${oppStyle.bg};border:1px solid ${oppStyle.border};border-radius:6px;padding:6px 12px;align-self:flex-start">
@@ -636,14 +635,14 @@ function renderEventsCard(d) {
           </div>` : ''}
         </div>
         ${svc.pitch_reference ? `
-        <div style="background:#fff;border-radius:6px;border:1px solid #C7D2FE;padding:10px 12px">
-          <div style="font-family:var(--mono);font-size:9px;color:#6366F1;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Reference in Outreach</div>
-          <div style="font-size:12px;color:#1E1B4B">📌 ${esc(svc.pitch_reference)}</div>
+        <div style="background:rgba(0,211,122,0.08);border-radius:6px;border:1px solid rgba(0,211,122,0.16);padding:10px 12px">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--indigo-light);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Reference in Outreach</div>
+          <div style="font-size:12px;color:var(--text-2)">📌 ${esc(svc.pitch_reference)}</div>
         </div>` : ''}
         ${svc.first_event_possible ? `
-        <div style="background:#fff;border-radius:6px;border:1px solid #C7D2FE;padding:10px 12px">
-          <div style="font-family:var(--mono);font-size:9px;color:#6366F1;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">First Win Possible</div>
-          <div style="font-size:12px;color:#1E1B4B">🚀 ${esc(svc.first_event_possible)}</div>
+        <div style="background:rgba(0,211,122,0.08);border-radius:6px;border:1px solid rgba(0,211,122,0.16);padding:10px 12px">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--indigo-light);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">First Win Possible</div>
+          <div style="font-size:12px;color:var(--text-2)">🚀 ${esc(svc.first_event_possible)}</div>
         </div>` : ''}
       </div>
     </div>` : '';
@@ -688,24 +687,45 @@ function renderEventsCard(d) {
       ${(d.formats_used || []).length ? `<div style="margin-top:14px"><div style="font-family:var(--mono);font-size:10px;color:var(--text-3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Formats Used</div><div style="display:flex;flex-wrap:wrap;gap:4px">${d.formats_used.map(f => badge(f, 'green')).join('')}</div></div>` : ''}
       ${(d.formats_missing || []).length ? `<div class="insight amber" style="margin-top:12px">📌 Missing formats: ${esc(d.formats_missing.join(' · '))}</div>` : ''}
       ${d.pitch_angle ? `<div class="insight" style="margin-top:10px">🎯 ${esc(d.pitch_angle)}</div>` : ''}
-      ${d.opening_line_for_pitch ? `<div style="margin-top:12px;padding:12px 14px;background:var(--indigo-dim);border:1px solid var(--indigo-border);border-radius:var(--radius-sm);font-size:13px;font-style:italic;color:#818CF8">"${esc(d.opening_line_for_pitch)}"</div>` : ''}
+      ${d.opening_line_for_pitch ? `<div style="margin-top:12px;padding:12px 14px;background:var(--indigo-dim);border:1px solid var(--indigo-border);border-radius:var(--radius-sm);font-size:13px;font-style:italic;color:var(--indigo-light)">"${esc(d.opening_line_for_pitch)}"</div>` : ''}
     </div>`;
 }
 
 /* People */
 function renderPeopleCard(p09, p10) {
   const el = $('card-people'); if (!el) return;
-  const people   = p09.buying_committee || [];
-  const contacts = p10.contacts || [];
-  const cmap     = {};
-  contacts.forEach(c => { if (c.name) cmap[c.name] = c; });
 
-  const cards = people.map(p => {
+  // Full null-safety — either pipeline output might be missing
+  const _p09 = p09 || {};
+  const _p10 = p10 || {};
+
+  const people   = _p09.buying_committee || [];
+  const contacts = _p10.contacts || [];
+
+  // Build a name→contact lookup for email enrichment
+  const cmap = {};
+  contacts.forEach(c => { if (c && c.name) cmap[c.name] = c; });
+
+  // If P09 found nobody but P10 has contacts, use those as fallback
+  const displayPeople = people.length > 0 ? people
+    : contacts.map(c => ({
+        name:                    c.name,
+        title:                   c.title,
+        company:                 _p09.parent_company || '',
+        role_type:               c.role_type || 'Contact',
+        outreach_priority:       c.outreach_priority || 'SECONDARY',
+        decision_relevance_score: 3,
+        linkedin_url:            c.linkedin_url || null,
+        personalisation_hook:    c.personalisation_hook || '',
+      }));
+
+  const cards = displayPeople.map(p => {
     const ct    = cmap[p.name] || {};
     const email = ct.email || '';
     const conf  = ct.email_confidence ? `${ct.email_confidence}%` : '';
     const score = p.decision_relevance_score || 0;
     const ini   = initials(p.name);
+    const liUrl = p.linkedin_url || ct.linkedin_url || '';
     return `
     <div class="person-card">
       <div class="person-avatar">${ini}</div>
@@ -716,28 +736,34 @@ function renderPeopleCard(p09, p10) {
       <div class="person-meta" style="margin-top:8px">
         ${p.outreach_priority === 'PRIMARY' ? badge('PRIMARY', 'green') : p.outreach_priority === 'SECONDARY' ? badge('SECONDARY', 'amber') : ''}
         ${p.role_type ? badge(p.role_type) : ''}
-        ${p.linkedin_activity ? badge('LinkedIn: ' + p.linkedin_activity) : ''}
-        ${email ? badge('✉ ' + email + (conf ? ' (' + conf + ')' : ''), 'blue') : ''}
-        ${ct.recommended_channel ? badge(ct.recommended_channel) : ''}
+        ${liUrl ? `<a href="${esc(liUrl)}" target="_blank" rel="noopener" class="badge blue" style="text-decoration:none">🔗 LinkedIn</a>` : ''}
+        ${email ? badge('✉ ' + email + (conf ? ' (' + conf + '%)' : ''), 'blue') : ''}
+        ${ct.recommended_channel ? `<span class="badge" style="font-size:9.5px">${esc(ct.recommended_channel)}</span>` : ''}
       </div>
       ${p.personalisation_hook ? `<div class="person-hook">💡 ${esc(p.personalisation_hook)}</div>` : ''}
     </div>`;
   }).join('');
 
+  const emailBar = _p10.email_pattern ? `<div class="email-pattern-bar">
+    Pattern: <strong style="color:var(--indigo)">${esc(_p10.email_pattern)}</strong>
+    <span>· ${_p10.verified_emails || 0} verified</span>
+    <span>· ${contacts.length} inferred</span>
+    <span style="color:var(--text-4);font-size:10px">· verify before sending</span>
+  </div>` : '';
+
+  const dataNote = _p10.data_disclaimer
+    ? `<div style="margin-top:8px;font-size:11px;color:var(--text-3)">⚠ ${esc(_p10.data_disclaimer)}</div>` : '';
+
   el.innerHTML = `
     <div class="card-head"><span class="card-title">Decision Makers & Contact Intelligence</span>
-      ${people.length ? `<span class="badge indigo">${people.length} stakeholder${people.length !== 1 ? 's' : ''}</span>` : ''}
+      ${displayPeople.length ? `<span class="badge indigo">${displayPeople.length} stakeholder${displayPeople.length !== 1 ? 's' : ''}</span>` : ''}
     </div>
     <div class="card-body">
       <div class="people-grid">
-        ${cards || '<div style="color:var(--text-3);padding:16px 0;font-family:var(--mono);font-size:12px">No decision makers found</div>'}
+        ${cards || '<div style="color:var(--text-3);padding:24px 0;text-align:center;font-family:var(--mono);font-size:12px">No decision-maker data found — try a larger or more publicly listed company</div>'}
       </div>
-      ${p10.email_pattern ? `<div class="email-pattern-bar">
-        Email pattern: <strong style="color:var(--indigo)">${esc(p10.email_pattern)}</strong>
-        <span>· ${p10.verified_emails || 0} verified</span>
-        <span>· ${p10.inferred_emails || 0} inferred</span>
-      </div>` : ''}
-      ${p10.data_disclaimer ? `<div style="margin-top:8px;font-size:11px;color:var(--text-3)">⚠ ${esc(p10.data_disclaimer)}</div>` : ''}
+      ${emailBar}
+      ${dataNote}
     </div>`;
 }
 
@@ -1442,7 +1468,7 @@ function buildPDFHTML(data) {
       <div style="margin-bottom:18px;border-radius:8px;overflow:hidden;border:1px solid #C7D2FE">
         <div style="background:#4F46E5;padding:9px 14px;display:flex;align-items:center;gap:8px">
           <span style="font-size:13px">🎯</span>
-          <span style="font-size:9px;font-weight:700;letter-spacing:.12em;color:#C7D2FE;text-transform:uppercase">Agency Service Fit</span>
+          <span style="font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--indigo-light);text-transform:uppercase">Agency Service Fit</span>
         </div>
         <div style="background:#EEF2FF;padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start">
           <div>

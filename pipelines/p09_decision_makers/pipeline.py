@@ -155,15 +155,26 @@ def _parse_employees(items: list, company_name: str) -> list:
         "advertising", "media", "partnerships", "community",
     ]
 
-    people = []
+    people     = []
+    all_people = []  # full list — used as fallback when filter yields too few
+
     for item in (items or []):
         name = (item.get("name") or "").strip()
         if not name:
             continue
 
-        headline = (item.get("headline") or "").strip()
+        headline    = (item.get("headline") or "").strip()
         profile_url = (item.get("profileUrl") or "").strip()
-        company = (item.get("companyName") or company_name).strip()
+        company     = (item.get("companyName") or company_name).strip()
+
+        person = {
+            "name":         name,
+            "title":        headline,
+            "company":      company,
+            "linkedin_url": profile_url if "linkedin.com/in/" in profile_url else None,
+            "source":       "apify_linkedin",
+        }
+        all_people.append(person)
 
         headline_lower = headline.lower()
         is_marketing = any(kw in headline_lower for kw in marketing_keywords)
@@ -175,16 +186,14 @@ def _parse_employees(items: list, company_name: str) -> list:
             "vp ", "director", "head of", "head,",
         ])
 
-        if not (is_marketing or is_senior):
-            continue  # Skip clearly irrelevant roles (engineers, finance, etc.)
+        if is_marketing or is_senior:
+            people.append(person)
 
-        people.append({
-            "name":         name,
-            "title":        headline,
-            "company":      company,
-            "linkedin_url": profile_url if "linkedin.com/in/" in profile_url else None,
-            "source":       "apify_linkedin",
-        })
+    # If strict filter leaves too few, pass all scraped people so the LLM can pick
+    if len(people) < 3 and all_people:
+        log.info("     Few marketing/senior matches — expanding to all scraped employees",
+                 filtered=len(people), total=len(all_people))
+        people = all_people[:20]
 
     log.info("     Employee parse complete",
              total_scraped=len(items or []),
@@ -335,13 +344,21 @@ class DecisionMakersPipeline(BasePipeline):
         search_parsed = {}
         final_people  = []
 
-        if merged_raw:
-            people_text = "\n".join(
-                f"- {p['name']} | {p['title']} | {p.get('company', '')} | "
-                f"LinkedIn: {p.get('linkedin_url') or 'not found'} | source: {p.get('source', '')}"
-                for p in merged_raw
-            )
+        # Always attempt synthesis — even when LinkedIn returns 0 results,
+        # the Google search snippets and team page often contain real names/titles.
+        people_text = "\n".join(
+            f"- {p['name']} | {p['title']} | {p.get('company', '')} | "
+            f"LinkedIn: {p.get('linkedin_url') or 'not found'} | source: {p.get('source', '')}"
+            for p in merged_raw
+        ) if merged_raw else "(none found via LinkedIn scraper)"
 
+        has_any_signal = bool(
+            merged_raw
+            or structured.get("search_text", "").strip()
+            or structured.get("team_page", "").strip()
+        )
+
+        if has_any_signal:
             synthesis_prompt = f"""COMPANY: {n}
 CATEGORY: {category}
 LINKEDIN PAGE: {structured.get('company_li_url') or 'not found'}
@@ -352,11 +369,13 @@ EMPLOYEES FOUND VIA LINKEDIN SCRAPER:
 TEAM PAGE EXCERPT:
 {structured['team_page'] or '(not found)'}
 
-ADDITIONAL SEARCH SIGNALS:
-{structured['search_text'][:800]}
+ADDITIONAL SEARCH SIGNALS (Google results — names and titles often appear in snippets):
+{structured['search_text'][:1200]}
 
-From the people above, identify the 2-5 best marketing/events decision-makers to contact.
-Only include people from the data above — do not add anyone not listed."""
+From ALL sources above (employees list, team page, AND search snippets), identify up to 5
+people who are marketing / experiential-marketing / events / brand decision-makers.
+If a name appears in a search snippet with a relevant title, include them.
+Only include people with at least one piece of evidence in the data above — do not invent."""
 
             raw_result    = synthesise(SYNTHESIS_SYSTEM_PROMPT, synthesis_prompt, max_tokens=1400)
             search_parsed = safe_json_parse(raw_result or "") or {}
