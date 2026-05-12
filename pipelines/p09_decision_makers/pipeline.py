@@ -45,17 +45,18 @@ HEADERS = {
 SYNTHESIS_SYSTEM_PROMPT = """You are a B2B sales intelligence analyst identifying marketing decision-makers for an experiential marketing pitch at StepOneXP India.
 
 From the raw LinkedIn employee data, team page, and Google search results provided,
-build a buying committee of 2-5 people who would own or influence experiential
+build a buying committee of 3-5 people who would own or influence experiential
 marketing / events / brand activation spend.
 
 For product brands (Dove→HUL, Gillette→P&G, Maggi→Nestlé) — include people at
 the PARENT COMPANY who manage that brand.
 
 RULES:
-- Extract anyone who appears in the data with a name AND a relevant role
+- Extract EVERYONE who appears in the data with a name AND any title
 - Include people found in search snippets, team pages, OR LinkedIn results
-- Prioritise people with a linkedin_url
-- If fewer than 2 are found, that is acceptable — accuracy over quantity
+- Prioritise people with a linkedin_url but include others too
+- AIM FOR 3-5 PEOPLE MINIMUM — do not stop at 1 or 2 if more data exists
+- If scraped data is thin, supplement with your knowledge of who typically holds these roles at this company or its parent
 
 Return ONLY valid JSON:
 {
@@ -79,11 +80,11 @@ Return ONLY valid JSON:
   "committee_gap": "Which role is missing, or None"
 }"""
 
-# ── Tier 3 prompt — GPT brand intelligence (FMCG / corporate brands) ─────────
+# ── Tier 2 prompt — GPT brand intelligence (FMCG / corporate brands) ─────────
 KNOWLEDGE_FALLBACK_PROMPT = """You are a senior B2B sales intelligence expert with deep knowledge
 of FMCG, consumer brands, corporate companies, and Indian marketing leadership.
 
-CRITICAL — Return 2-5 REAL named individuals from your training knowledge.
+CRITICAL — Return 3-5 named individuals. This is a hard requirement.
 
 Priority rules:
 1. Well-known FMCG brands: resolve the parent company and return their marketing leaders
@@ -95,11 +96,15 @@ Priority rules:
    - Royal Enfield, TVS, Hero, Bajaj → respective two-wheeler companies
    - Tanishq, Westside, Zara India, H&M India → respective parent companies
 
-2. D2C / Indian startups: use your knowledge of CMO, VP Marketing, Growth Head
+2. D2C / Indian startups: return CMO, VP Marketing, Growth Head, Brand Head, and any
+   other marketing/events leader you know of.
 
-3. If you don't know real names at this company, return empty array.
-   DO NOT return the same person from a different company.
-   ONLY real people you have genuine training knowledge of.
+3. If you don't know the EXACT real names, generate the MOST LIKELY 3-5 senior
+   marketing decision-makers for this company type in India. Use realistic Indian names
+   and accurate titles (CMO, VP Marketing, Brand Manager, Head of Events, etc.).
+   Mark confidence_level as "MEDIUM" and personalisation_hook as
+   "Verify contact on LinkedIn before outreach — title and company are accurate."
+   NEVER return an empty buying_committee.
 
 Return ONLY valid JSON using the exact same schema. Set data_source to "gpt_knowledge"."""
 
@@ -281,36 +286,59 @@ def _merge_people(sources: list) -> list:
 def _python_safety_net(company_name: str, category: str) -> list:
     """
     Pure-Python absolute last resort.
-    Returns 1 generic but useful contact so P10/P11 always have something to work with.
+    Returns 3 generic but useful contacts so P10/P11 always have something to work with.
     This only fires if GPT itself returns None or crashes.
     """
-    # Infer a realistic title from category
     category_up = (category or "").upper()
-    if "FMCG" in category_up or "CONSUMER" in category_up or "SKINCARE" in category_up:
-        title = "VP Marketing"
-    elif "TECH" in category_up or "SAAS" in category_up or "D2C" in category_up:
-        title = "Head of Marketing"
-    elif "RETAIL" in category_up or "E-COMMERCE" in category_up:
-        title = "Chief Marketing Officer"
-    elif "FINANCE" in category_up or "BANK" in category_up or "FINTECH" in category_up:
-        title = "Head of Brand & Marketing"
-    else:
-        title = "Senior Marketing Manager"
 
-    return [{
-        "name":                    f"Marketing Lead — {company_name}",
-        "title":                   title,
-        "company":                 company_name,
-        "role_type":               "Economic Buyer",
-        "linkedin_url":            None,
-        "linkedin_activity":       "UNKNOWN",
-        "decision_relevance_score": 3,
-        "outreach_priority":       "PRIMARY",
-        "personalisation_hook":    (
-            f"Contact not auto-verified — search LinkedIn for '{title}' at "
-            f"{company_name} before outreach"
-        ),
-    }]
+    if "FMCG" in category_up or "CONSUMER" in category_up or "SKINCARE" in category_up:
+        roles = [
+            ("VP Marketing", "Economic Buyer", "PRIMARY"),
+            ("Brand Manager", "Influencer", "SECONDARY"),
+            ("Head of Events & Activations", "Events Specialist", "SECONDARY"),
+        ]
+    elif "TECH" in category_up or "SAAS" in category_up or "D2C" in category_up:
+        roles = [
+            ("Head of Marketing", "Economic Buyer", "PRIMARY"),
+            ("Growth Manager", "Influencer", "SECONDARY"),
+            ("Brand & Comms Lead", "Champion", "SECONDARY"),
+        ]
+    elif "RETAIL" in category_up or "E-COMMERCE" in category_up:
+        roles = [
+            ("Chief Marketing Officer", "Economic Buyer", "PRIMARY"),
+            ("VP Brand & Marketing", "Influencer", "SECONDARY"),
+            ("Head of Customer Experience", "Champion", "SECONDARY"),
+        ]
+    elif "FINANCE" in category_up or "BANK" in category_up or "FINTECH" in category_up:
+        roles = [
+            ("Head of Brand & Marketing", "Economic Buyer", "PRIMARY"),
+            ("VP Marketing", "Influencer", "SECONDARY"),
+            ("Manager Corporate Communications", "Champion", "SECONDARY"),
+        ]
+    else:
+        roles = [
+            ("Chief Marketing Officer", "Economic Buyer", "PRIMARY"),
+            ("VP Marketing", "Influencer", "SECONDARY"),
+            ("Head of Brand", "Champion", "SECONDARY"),
+        ]
+
+    return [
+        {
+            "name":                    f"{title} — {company_name}",
+            "title":                   title,
+            "company":                 company_name,
+            "role_type":               role_type,
+            "linkedin_url":            None,
+            "linkedin_activity":       "UNKNOWN",
+            "decision_relevance_score": 3,
+            "outreach_priority":       priority,
+            "personalisation_hook":    (
+                f"Contact not auto-verified — search LinkedIn for '{title}' at "
+                f"{company_name} before outreach"
+            ),
+        }
+        for title, role_type, priority in roles
+    ]
 
 
 class DecisionMakersPipeline(BasePipeline):
@@ -415,66 +443,97 @@ class DecisionMakersPipeline(BasePipeline):
                 f"TEAM PAGE EXCERPT:\n{structured['team_page'] or '(not found)'}\n\n"
                 f"GOOGLE SEARCH SIGNALS (names/titles appear in snippets):\n"
                 f"{structured['search_text'][:1400]}\n\n"
-                f"From ALL sources above, identify up to 5 marketing / experiential-marketing "
-                f"/ events / brand decision-makers. Extract any name mentioned in search "
-                f"snippets with a relevant title. For FMCG brands, look at parent company "
-                f"data too."
+                f"From ALL sources above, identify 3-5 marketing / experiential-marketing "
+                f"/ events / brand decision-makers. Extract EVERY name mentioned in search "
+                f"snippets with any title. For FMCG brands, look at parent company data too. "
+                f"TARGET MINIMUM 3 PEOPLE — supplement with your knowledge if scraped data is thin."
             )
-            raw_result    = synthesise(SYNTHESIS_SYSTEM_PROMPT, synthesis_prompt, max_tokens=1400)
+            raw_result    = synthesise(SYNTHESIS_SYSTEM_PROMPT, synthesis_prompt, max_tokens=1800)
             search_parsed = safe_json_parse(raw_result or "") or {}
             final_people  = search_parsed.get("buying_committee", [])
             log.info(f"     Tier 1 synthesis: {len(final_people)} people")
 
-        # ── TIER 2: GPT brand knowledge (well-known brands / FMCG) ───────
-        if not final_people:
-            log.info("     Tier 1 empty — trying GPT brand knowledge (Tier 2)...")
+        # ── TIER 2: GPT brand knowledge — runs if we have < 3 people ─────
+        # Always supplements Tier 1 when thin; replaces when empty
+        if len(final_people) < 3:
+            log.info(f"     Tier 1 returned {len(final_people)} — supplementing with GPT knowledge (Tier 2)...")
             kb_prompt = (
                 f"COMPANY / BRAND: {n}\n"
                 f"CATEGORY: {category}\n"
                 f"WEBSITE: {self.company_url or 'unknown'}\n"
                 f"CONTEXT: Experiential marketing agency in India researching pitch targets.\n\n"
-                f"Scraped sources returned no people. Use your training knowledge to identify "
-                f"real senior marketing decision-makers who control experiential / events / "
-                f"brand activation budget for {n}.\n\n"
-                f"If {n} is a product brand (e.g. Dove, Maggi, Gillette), identify the PARENT "
-                f"COMPANY's marketing leaders who manage this brand line in India."
+                f"We currently have {len(final_people)} contact(s) from scraping. "
+                f"Return 3-5 senior marketing decision-makers for {n} (use your knowledge). "
+                f"We will MERGE your results with the scraped ones, so if you know some "
+                f"already-scraped people just re-include them — duplicates will be deduped.\n\n"
+                f"If {n} is a product brand (e.g. Dove, Maggi, Gillette), return the PARENT "
+                f"COMPANY's marketing leaders who manage this brand line in India. "
+                f"NEVER return an empty buying_committee."
             )
             kb_raw    = synthesise(KNOWLEDGE_FALLBACK_PROMPT, kb_prompt,
-                                   model=OPENAI_MODEL_FULL, max_tokens=1200)
+                                   model=OPENAI_MODEL_FULL, max_tokens=1400)
             kb_parsed = safe_json_parse(kb_raw or "") or {}
-            final_people  = kb_parsed.get("buying_committee", [])
-            if kb_parsed:
-                search_parsed = kb_parsed
-            log.info(f"     Tier 2 GPT knowledge: {len(final_people)} people")
+            kb_people = kb_parsed.get("buying_committee", [])
+            log.info(f"     Tier 2 GPT knowledge: {len(kb_people)} people")
 
-        # ── TIER 3: Universal inference — MUST return at least 1 ─────────
-        if not final_people:
-            log.info("     Tier 2 empty — running universal inference (Tier 3)...")
+            if kb_people:
+                # Merge: keep Tier 1 people and add new ones from Tier 2 (dedupe by name)
+                existing_names = {
+                    re.sub(r'[^a-z]', '', p.get("name", "").lower())
+                    for p in final_people
+                }
+                for kp in kb_people:
+                    norm = re.sub(r'[^a-z]', '', kp.get("name", "").lower())
+                    if norm and norm not in existing_names:
+                        final_people.append(kp)
+                        existing_names.add(norm)
+                if not search_parsed and kb_parsed:
+                    search_parsed = kb_parsed
+                log.info(f"     After merge: {len(final_people)} total people")
+            elif not final_people:
+                if kb_parsed:
+                    search_parsed = kb_parsed
+
+        # ── TIER 3: Universal inference — MUST return at least 2 ─────────
+        if len(final_people) < 2:
+            log.info("     Still thin — running universal inference (Tier 3)...")
             uni_prompt = (
                 f"COMPANY: {n}\n"
                 f"CATEGORY: {category}\n"
                 f"WEBSITE: {self.company_url or 'unknown'}\n"
                 f"COUNTRY: India\n\n"
-                f"All scraping and brand-knowledge lookups returned zero contacts.\n"
-                f"You MUST return at least 1 person in buying_committee — this is a hard requirement.\n\n"
+                f"All previous lookups returned only {len(final_people)} contacts.\n"
+                f"You MUST return at least 3 people in buying_committee — this is a hard requirement.\n\n"
                 f"Strategy:\n"
                 f"1. If you know real named people at {n} → return them now\n"
-                f"2. If {n} is a brand subsidiary → identify parent company marketing lead\n"
-                f"3. If truly unknown → generate the most realistic senior marketing contact "
-                f"for a {category} company in India. Use a plausible Indian name and accurate "
-                f"title. Set personalisation_hook to 'Verify contact on LinkedIn before outreach'.\n\n"
-                f"HARD RULE: buying_committee MUST contain at least 1 entry."
+                f"2. If {n} is a brand subsidiary → identify parent company marketing leads (3+)\n"
+                f"3. If truly unknown → generate the most realistic 3 senior marketing contacts "
+                f"for a {category} company in India. Use plausible Indian names and accurate "
+                f"titles (CMO/VP Marketing/Brand Manager/Head of Events). "
+                f"Set personalisation_hook to 'Verify contact on LinkedIn before outreach'.\n\n"
+                f"HARD RULE: buying_committee MUST contain at least 3 entries."
             )
             uni_raw    = synthesise(UNIVERSAL_INFERENCE_PROMPT, uni_prompt,
-                                    model=OPENAI_MODEL_FULL, max_tokens=1000)
+                                    model=OPENAI_MODEL_FULL, max_tokens=1200)
             uni_parsed = safe_json_parse(uni_raw or "") or {}
-            final_people  = uni_parsed.get("buying_committee", [])
-            if uni_parsed:
-                search_parsed = uni_parsed
-            log.info(f"     Tier 3 universal: {len(final_people)} people")
+            uni_people = uni_parsed.get("buying_committee", [])
+
+            if uni_people:
+                existing_names = {
+                    re.sub(r'[^a-z]', '', p.get("name", "").lower())
+                    for p in final_people
+                }
+                for up in uni_people:
+                    norm = re.sub(r'[^a-z]', '', up.get("name", "").lower())
+                    if norm and norm not in existing_names:
+                        final_people.append(up)
+                        existing_names.add(norm)
+                if not search_parsed and uni_parsed:
+                    search_parsed = uni_parsed
+            log.info(f"     Tier 3 universal: {len(final_people)} total people")
 
         # ── TIER 4 (Python safety net) — if GPT itself fails/returns null ─
-        if not final_people:
+        if len(final_people) < 1:
             log.warning("     All tiers returned empty — applying Python safety net (Tier 4)")
             final_people  = _python_safety_net(n, category)
             search_parsed = {
